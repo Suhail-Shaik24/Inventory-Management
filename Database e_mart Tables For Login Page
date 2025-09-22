@@ -1,0 +1,79 @@
+CREATE DATABASE e_mart;
+USE e_mart;
+
+CREATE TABLE users(
+    user_id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    role VARCHAR(20) DEFAULT 'staff',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    phone_number VARCHAR(20) NULL
+);
+
+INSERT INTO users (username, email, password_hash, first_name, last_name, role, phone_number) VALUES
+('admin', 'admin@inventory.com', 'admin123', 'John', 'Doe', 'admin', '+1-555-0101'),
+('manager1', 'manager@inventory.com', 'manager1', 'Jane', 'Smith', 'manager', '+1-555-0102'),
+('staff1', 'staff@inventory.com', 'staff123', 'Mike', 'Johnson', 'staff', '+1-555-0103'),
+('inventory_clerk', 'clerk@inventory.com', 'clerk123', 'Sarah', 'Wilson', 'staff', '+1-555-0104'),
+('warehouse_mgr', 'warehouse@inventory.com', 'warehouse', 'Robert', 'Brown', 'manager', '+1-555-0105');
+
+CREATE TABLE user_sessions (
+    session_id VARCHAR(128) PRIMARY KEY,
+    user_id INT NOT NULL,
+    login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    logout_time TIMESTAMP NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    user_agent TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+INSERT INTO user_sessions (session_id, user_id, login_time, logout_time, ip_address, user_agent, is_active) VALUES
+('sess_abc123def456ghi789', 1, '2024-01-15 09:30:00', '2024-01-15 12:00:00', '192.168.1.100', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', FALSE),
+('sess_xyz789uvw456rst123', 2, '2024-01-15 10:15:00', NULL, '192.168.1.101', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36', TRUE),
+('sess_mno321pqr654stu987', 3, '2024-01-15 11:21:00', NULL, '192.168.1.102', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', TRUE),
+('sess_def456ghi789jkl012', 4, '2024-01-15 08:45:00', '2024-01-15 17:30:00', '192.168.1.103', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', FALSE),
+('sess_jkl012mno345pqr678', 5, '2024-01-15 07:30:00', NULL, '192.168.1.104', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36', TRUE);
+
+CREATE TABLE login_attempts (
+    attempt_id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    is_successful BOOLEAN DEFAULT FALSE,
+    user_agent TEXT
+);
+
+INSERT INTO login_attempts (username, ip_address, attempt_time, is_successful, user_agent) VALUES
+('admin', '192.168.1.100', '2024-01-15 09:30:00', TRUE, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'),
+('admin', '192.168.1.100', '2024-01-15 14:25:00', TRUE, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'),
+('manager1', '192.168.1.101', '2024-01-15 10:15:00', TRUE, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'),
+('staff1', '192.168.1.102', '2024-01-15 11:20:00', FALSE, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'),
+('staff1', '192.168.1.102', '2024-01-15 11:21:00', TRUE, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'),
+('unknown_user', '192.168.1.105', '2024-01-15 12:30:00', FALSE, 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36');
+
+CREATE TABLE password_reset_tokens (
+    token_id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    reset_token VARCHAR(100) UNIQUE NOT NULL,
+    token_expiry TIMESTAMP NOT NULL,
+    is_used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+INSERT INTO password_reset_tokens (user_id, reset_token, token_expiry, is_used) VALUES
+(2, 'reset_token_abc123xyz789', '2024-01-15 14:15:00', FALSE),
+(3, 'reset_token_def456uvw012', '2024-01-14 18:30:00', TRUE),
+(4, 'reset_token_ghi789rst345', '2024-01-16 10:00:00', FALSE),
+(1, 'reset_token_jkl012mno678', '2024-01-13 15:45:00', TRUE),
+(5, 'reset_token_pqr901stu234', '2024-01-15 20:00:00', FALSE);
+
+SELECT * FROM users;
+SELECT * FROM user_sessions;
+SELECT * FROM login_attempts;
+SELECT * FROM password_reset_tokens;
