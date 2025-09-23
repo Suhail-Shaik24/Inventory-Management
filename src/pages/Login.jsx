@@ -1,46 +1,49 @@
 import bg from "../assets/background.avif";
 import TopBar from "../components/TopBar";
+import { NavLink } from "react-router-dom";
 
 export default function Login() {
   return (
-    <div className="min-h-screen w-full bg-brandDark bg-cover bg-center flex flex-col items-center justify-center" style={{ backgroundImage: `url(${bg})` }}>
+    <div className="flex flex-col items-center justify-center w-full min-h-screen bg-center bg-cover bg-brandDark" style={{ backgroundImage: `url(${bg})` }}>
       <div className="h-[60px]" />
       {/* Top Bar */}
-      <div className="w-full flex items-center justify-center">
+      <div className="flex items-center justify-center w-full">
         <TopBar title="LOGO & Company name" showIcons={false} />
       </div>
       {/* Centered Login Card */}
-      <div className="w-full max-w-3xl flex flex-1 items-center justify-center bg-transparent">
+      <div className="flex items-center justify-center flex-1 w-full max-w-3xl bg-transparent">
         <div className="w-full max-w-lg bg-brandMaroon p-8 rounded-xl shadow-lg border border-brandBeige flex flex-col items-center mt-[-60px]">
           <form className="w-full space-y-4">
             <input
               type="text"
               placeholder="Username"
-              className="w-full p-3 rounded-md border focus:ring-2 focus:ring-brandBeige text-black"
+              className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
             />
             <input
               type="password"
               placeholder="Password"
-              className="w-full p-3 rounded-md border focus:ring-2 focus:ring-brandBeige text-black"
+              className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
             />
             <div className="flex items-center gap-2">
-              <div className="px-3 py-2 bg-gray-200 rounded font-mono flex items-center gap-2 text-black">
+              <div className="flex items-center gap-2 px-3 py-2 font-mono text-black bg-gray-200 rounded">
                 LTWn02q
-                <i className="fa fa-refresh text-gray-500 cursor-pointer" />
+                <i className="text-gray-500 cursor-pointer fa fa-refresh" />
               </div>
               <input
                 type="text"
                 placeholder="Enter Captcha"
-                className="flex-1 p-3 rounded-md border focus:ring-2 focus:ring-brandBeige text-black"
+                className="flex-1 p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
               />
             </div>
-            <button
-              type="submit"
-              className="w-full bg-brandBeige text-brandDark font-semibold py-2 rounded-md hover:opacity-90 transition mt-2"
-            >
-              LOGIN
-            </button>
-            <div className="text-center text-xs text-white space-y-1 mt-2">
+            <NavLink to="/dashboard">
+              <button
+                type="submit"
+                className="w-full py-2 mt-2 font-semibold transition rounded-md bg-brandBeige text-brandDark hover:opacity-90"
+              >
+                LOGIN
+              </button>
+            </NavLink>
+            <div className="mt-2 space-y-1 text-xs text-center text-white">
               <div>
                 <a href="#" className="hover:underline">Forgot password</a>
                 <span className="mx-1">|</span>
