@@ -4,10 +4,11 @@ import bg from "../assets/background.avif";
 import TopBar from "../components/TopBar";
 import { NavLink, useNavigate } from "react-router-dom";
 
-export default function Login() {
+export default function Signup() {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [captcha, setCaptcha] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -17,26 +18,36 @@ export default function Login() {
     setLoading(true);
     setMessage("");
 
-    // Basic captcha check (static for now: "LTWn02q")
-    if (captcha !== "LTWn02q") {
-      setMessage("Invalid captcha");
+    if (password !== confirmPassword) {
+      setMessage("Passwords do not match");
+      setLoading(false);
+      return;
+    }
+
+    if (username.length < 3) {
+      setMessage("Username must be at least 3 characters");
+      setLoading(false);
+      return;
+    }
+
+    if (!email.includes("@")) {
+      setMessage("Enter a valid email");
       setLoading(false);
       return;
     }
 
     try {
-      const response = await axios.post("http://localhost:8081/api/auth/login", null, {
-        params: { username, password },
+      const response = await axios.post("http://localhost:8081/api/auth/signup", null, {
+        params: { username, email, password },
       });
       const data = response.data;
       setMessage(data.message);
       if (data.success) {
-        console.log("Login successful, role:", data.role);
-        localStorage.setItem('role', data.role);  // Store role for dashboard
-        navigate("/dashboard");  // Only redirect on success
+        console.log("Signup successful—redirect to login");
+        navigate("/");
       }
     } catch (error) {
-      setMessage("Login failed: " + (error.response?.data?.message || error.message));
+      setMessage("Signup failed: " + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -49,7 +60,7 @@ export default function Login() {
       <div className="flex items-center justify-center w-full">
         <TopBar title="LOGO & Company name" showIcons={false} />
       </div>
-      {/* Centered Login Card */}
+      {/* Centered Signup Card */}
       <div className="flex items-center justify-center flex-1 w-full max-w-3xl bg-transparent">
         <div className="w-full max-w-lg bg-brandMaroon p-8 rounded-xl shadow-lg border border-brandBeige flex flex-col items-center mt-[-60px]">
           <form className="w-full space-y-4" onSubmit={handleSubmit}>
@@ -62,6 +73,14 @@ export default function Login() {
               required
             />
             <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
+              required
+            />
+            <input
               type="password"
               placeholder="Password"
               value={password}
@@ -69,36 +88,25 @@ export default function Login() {
               className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
               required
             />
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-2 font-mono text-black bg-gray-200 rounded">
-                LTWn02q
-                <i className="text-gray-500 cursor-pointer fa fa-refresh" />
-              </div>
-              <input
-                type="text"
-                placeholder="Enter Captcha"
-                value={captcha}
-                onChange={(e) => setCaptcha(e.target.value)}
-                className="flex-1 p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
-                required
-              />
-            </div>
+            <input
+              type="password"
+              placeholder="Confirm Password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
+              required
+            />
             <button
               type="submit"
               disabled={loading}
               className="w-full py-2 mt-2 font-semibold transition rounded-md bg-brandBeige text-brandDark hover:opacity-90"
             >
-              {loading ? "Logging in..." : "LOGIN"}
+              {loading ? "Signing up..." : "SIGN UP"}
             </button>
             {message && <p className="text-center text-white mt-2">{message}</p>}
             <div className="mt-2 space-y-1 text-xs text-center text-white">
               <div>
-                <a href="#" className="hover:underline">Forgot password</a>
-                <span className="mx-1">|</span>
-                <a href="#" className="hover:underline">Forgot username</a>
-              </div>
-              <div>
-                New Here? <NavLink to="/signup" className="underline text-brandBeige">Create an Account</NavLink>
+                Already have an account? <NavLink to="/" className="underline text-brandBeige">Login</NavLink>
               </div>
             </div>
           </form>
