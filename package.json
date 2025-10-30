@@ -12,8 +12,11 @@
   "dependencies": {
     "@headlessui/react": "^2.2.9",
     "axios": "^1.12.2",
+    "bwip-js": "^4.7.0",
+    "jsbarcode": "^3.12.1",
     "lucide-react": "^0.548.0",
     "react": "^19.1.1",
+    "react-barcode": "^1.6.1",
     "react-dom": "^19.1.1",
     "react-google-recaptcha": "^3.1.0",
     "react-router-dom": "^7.9.3",

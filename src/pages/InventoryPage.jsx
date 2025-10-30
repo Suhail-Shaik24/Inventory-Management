@@ -97,8 +97,10 @@
 
 
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import PageHeader from '../components/PageHeader';
+import bwipjs from "bwip-js";
+
 import {
     Package,
     PlusSquare,
@@ -112,6 +114,7 @@ import {
     User,
     List,
 } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
 
 // --- Reusable Sub-Page Header ---
 // This component provides a title and a "Back" button for each function
@@ -520,21 +523,37 @@ const UploadFileView = ({ setView }) => {
 
 // --- 7. Barcode Generation View ---
 const BarcodeView = ({ setView }) => {
-    const [productId, setProductId] = useState('');
-    const [barcodeImage, setBarcodeImage] = useState(null);
+    const [productId, setProductId] = useState("");
+    const [error, setError] = useState("");
+    const canvasRef = useRef(null);
 
     const handleGenerate = (e) => {
         e.preventDefault();
-        if (!productId) return;
-        // Simulate barcode generation by using a placeholder service
-        setBarcodeImage(
-            `https://placehold.co/400x120/ffffff/211309?text=BARCODE+FOR+${productId}`
-        );
+        setError("");
+
+        if (!productId) {
+            setError("Please enter a Product ID.");
+            return;
+        }
+
+        try {
+            // Generate barcode on the <canvas> element
+            bwipjs.toCanvas(canvasRef.current, {
+                bcid: "code128",        // Barcode type (Code128 works for most cases)
+                text: productId,        // Text to encode
+                scale: 3,               // 3x scaling
+                height: 10,             // Bar height (mm)
+                includetext: true,      // Show human-readable text
+                textxalign: "center",   // Center align text
+            });
+        } catch (err) {
+            setError("Failed to generate barcode. Please check the Product ID.");
+            console.error(err);
+        }
     };
 
     return (
         <div className="animate-fadeIn">
-            <SubPageHeader title="Barcode Generation" onBack={() => setView('main')} />
             <div className="rounded-xl bg-[#29190D]/70 p-6 shadow-lg shadow-black/30 backdrop-blur-sm">
                 <form onSubmit={handleGenerate} className="flex space-x-4">
                     <input
@@ -543,41 +562,41 @@ const BarcodeView = ({ setView }) => {
                         onChange={(e) => setProductId(e.target.value)}
                         placeholder="Enter Product ID (e.g., P1001)"
                         className="block w-full rounded-lg border-white/20 bg-white/5 p-3 text-white 
-            shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500/50"
+              shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500/50"
                         required
                     />
                     <button
                         type="submit"
                         className="flex-shrink-0 rounded-lg bg-amber-600 px-5 py-2.5 font-medium text-white shadow-md transition
-             hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+              hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                     >
                         Generate
                     </button>
                 </form>
 
-                {barcodeImage && (
-                    <div className="mt-8 text-center">
-                        <h3 className="text-lg font-medium text-white">Generated Barcode:</h3>
-                        <div className="mt-4 inline-block rounded-lg bg-white p-4">
-                            <img
-                                src={barcodeImage}
-                                alt={`Barcode for ${productId}`}
-                                className="h-auto w-full max-w-sm"
-                            />
-                        </div>
+                {error && (
+                    <p className="mt-4 text-red-400 text-center font-medium">{error}</p>
+                )}
+
+                <div className="mt-8 text-center">
+                    <canvas ref={canvasRef} className="mx-auto bg-white p-4 rounded-lg" />
+                    {productId && (
                         <button
                             onClick={() => window.print()}
                             className="mt-4 rounded-lg bg-gray-600 px-5 py-2.5 text-sm font-medium text-white shadow-md transition hover:bg-gray-700"
                         >
                             Print
                         </button>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );
 };
 
+
+
+// --- Main Exported Component ---
 const InventoryPage = () => {
     const [view, setView] = useState('main'); // 'main' is the grid
 
