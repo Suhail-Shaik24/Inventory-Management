@@ -1,116 +1,89 @@
 import { useState } from "react";
-import axios from "axios";
-import bg from "../assets/background.avif";
-import TopBar from "../components/TopBar";
-import { NavLink, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-export default function Signup() {
-  const [username, setUsername] = useState("");
+export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState("Maker");
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setMessage("");
 
-    if (password !== confirmPassword) {
-      setMessage("Passwords do not match");
-      setLoading(false);
+    const storedUsers = JSON.parse(localStorage.getItem("users")) || [];
+
+    // Check if user already exists
+    if (storedUsers.find((u) => u.email === email)) {
+      alert("User already exists!");
       return;
     }
 
-    if (username.length < 3) {
-      setMessage("Username must be at least 3 characters");
-      setLoading(false);
-      return;
-    }
-
-    if (!email.includes("@")) {
-      setMessage("Enter a valid email");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await axios.post("http://localhost:8081/api/auth/signup", null, {
-        params: { username, email, password },
-      });
-      const data = response.data;
-      setMessage(data.message);
-      if (data.success) {
-        console.log("Signup successful—redirect to login");
-        navigate("/");
-      }
-    } catch (error) {
-      setMessage("Signup failed: " + (error.response?.data?.message || error.message));
-    } finally {
-      setLoading(false);
-    }
+    const newUser = { email, password, role };
+    localStorage.setItem("users", JSON.stringify([...storedUsers, newUser]));
+    alert("Signup successful! You can now login.");
+    navigate("/login");
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-screen bg-center bg-cover bg-brandDark" style={{ backgroundImage: `url(${bg})` }}>
-      <div className="h-[60px]" />
-      {/* Top Bar */}
-      <div className="flex items-center justify-center w-full">
-        <TopBar title="LOGO & Company name" showIcons={false} />
-      </div>
-      {/* Centered Signup Card */}
-      <div className="flex items-center justify-center flex-1 w-full max-w-3xl bg-transparent">
-        <div className="w-full max-w-lg bg-brandMaroon p-8 rounded-xl shadow-lg border border-brandBeige flex flex-col items-center mt-[-60px]">
-          <form className="w-full space-y-4" onSubmit={handleSubmit}>
-            <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
-              required
-            />
+    <div className="flex justify-center items-center h-screen bg-gray-50">
+      <div className="bg-white shadow-lg rounded-2xl p-8 w-full max-w-md">
+        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
+          Create Account
+        </h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-gray-600 font-medium mb-1">Email</label>
             <input
               type="email"
-              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
               required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#864E25] outline-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-gray-600 font-medium mb-1">Password</label>
             <input
               type="password"
-              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
               required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#864E25] outline-none"
             />
-            <input
-              type="password"
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full p-3 text-black border rounded-md focus:ring-2 focus:ring-brandBeige"
-              required
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2 mt-2 font-semibold transition rounded-md bg-brandBeige text-brandDark hover:opacity-90"
+          </div>
+
+          <div>
+            <label className="block text-gray-600 font-medium mb-1">Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#864E25] outline-none"
             >
-              {loading ? "Signing up..." : "SIGN UP"}
-            </button>
-            {message && <p className="text-center text-white mt-2">{message}</p>}
-            <div className="mt-2 space-y-1 text-xs text-center text-white">
-              <div>
-                Already have an account? <NavLink to="/" className="underline text-brandBeige">Login</NavLink>
-              </div>
-            </div>
-          </form>
-        </div>
+              <option value="Admin">Admin</option>
+              <option value="Maker">Maker</option>
+              <option value="Checker">Checker</option>
+            </select>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-[#864E25] hover:bg-[#6f3f1d] text-white py-2 rounded-lg font-semibold transition duration-200"
+          >
+            Sign Up
+          </button>
+
+          <p className="text-center text-sm text-gray-600 mt-3">
+            Already have an account?{" "}
+            <span
+              onClick={() => navigate("/login")}
+              className="text-[#864E25] cursor-pointer hover:underline"
+            >
+              Log in
+            </span>
+          </p>
+        </form>
       </div>
     </div>
   );

@@ -5,3 +5,13 @@
   --color-brandMaroon: #7a1c1d;
   --color-brandDark: #1a1a1a;
 }
+
+@layer utilities {
+  .bg-loginImage {
+    background-image: url('./assets/LoginBackground.jpg');
+    background-size: cover;
+    background-position: center;
+    max-width: 100%;
+    height: auto;
+  }
+}
