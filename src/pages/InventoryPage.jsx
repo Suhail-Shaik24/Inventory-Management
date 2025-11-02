@@ -1,106 +1,9 @@
-// import PageHeader from '../components/PageHeader';
-// import {
-//     Package,
-//     PlusSquare,
-//     LayoutGrid,
-//     Truck,
-//     UploadCloud,
-//     QrCode,
-//     ArrowRight,
-// } from 'lucide-react';
-
-// // Mock data for the inventory options
-// const inventoryOptions = [
-//     {
-//         title: 'Manage Products',
-//         description: 'Edit, delete, or view all products.',
-//         icon: Package,
-//         href: '#',
-//     },
-//     {
-//         title: 'Add New Stock',
-//         description: 'Log new inventory arrivals.',
-//         icon: PlusSquare,
-//         href: '#',
-//     },
-//     {
-//         title: 'Manage Categories',
-//         description: 'Organize products into categories.',
-//         icon: LayoutGrid,
-//         href: '#',
-//     },
-//     {
-//         title: 'Suppliers',
-//         description: 'View and manage supplier details.',
-//         icon: Truck,
-//         href: '#',
-//     },
-//     {
-//         title: 'Upload Inventory File',
-//         description: 'Bulk upload stock via CSV/file feed.',
-//         icon: UploadCloud,
-//         href: '#',
-//     },
-//     {
-//         title: 'Barcode Generation',
-//         description: 'Create and print product barcodes.',
-//         icon: QrCode,
-//         href: '#',
-//     },
-// ];
-
-
-// const InventoryPage = () => {
-//     return (
-//         <div className="animate-fadeIn">
-
-//             {/* --- Grid of Inventory Options --- */}
-//             <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-//                 {inventoryOptions.map((option) => (
-//                     <a
-//                         key={option.title}
-//                         href={option.href}
-//                         className="group flex flex-col justify-between rounded-xl 
-//                        bg-[#29190D]/70 p-6 shadow-lg shadow-black/30 
-//                        backdrop-blur-sm transition-all
-//                        hover:bg-white/10 hover:shadow-amber-900/40"
-//                     >
-//                         <div>
-//                             <div
-//                                 className="flex h-12 w-12 items-center justify-center 
-//                            rounded-lg bg-amber-600/20 text-amber-500"
-//                             >
-//                                 <option.icon className="h-6 w-6" />
-//                             </div>
-//                             <h3 className="mt-4 text-lg font-semibold text-white">
-//                                 {option.title}
-//                             </h3>
-//                             <p className="mt-1 text-sm text-gray-400">
-//                                 {option.description}
-//                             </p>
-//                         </div>
-//                         <div
-//                             className="mt-4 flex items-center text-sm font-medium 
-//                          text-amber-500 transition-all 
-//                          group-hover:translate-x-1 group-hover:text-amber-400"
-//                         >
-//                             Go to section <ArrowRight className="ml-1.5 h-4 w-4" />
-//                         </div>
-//                     </a>
-//                 ))}
-//             </div>
-//         </div>
-//     );
-// };
-
-// export default InventoryPage;
-
-
-
 import { useState, useRef } from 'react';
 import PageHeader from '../components/PageHeader';
 import bwipjs from "bwip-js";
-
+import { api } from '../api/client';
+import { Dialog } from "@headlessui/react";
+import { NavLink } from 'react-router-dom';
 import {
     Package,
     PlusSquare,
@@ -183,14 +86,14 @@ const InventoryGrid = ({ setView }) => {
                     <button
                         key={option.title}
                         onClick={() => setView(option.view)}
-                        className="group flex flex-col justify-between rounded-xl 
-            bg-[#29190D]/70 p-6 text-left shadow-lg shadow-black/30 
+                        className="group flex flex-col justify-between rounded-xl
+            bg-[#29190D]/70 p-6 text-left shadow-lg shadow-black/30
             backdrop-blur-sm transition-all
             hover:bg-white/10 hover:shadow-amber-900/40"
                     >
                         <div>
                             <div
-                                className="flex h-12 w-12 items-center justify-center 
+                                className="flex h-12 w-12 items-center justify-center
                 rounded-lg bg-amber-600/20 text-amber-500"
                             >
                                 <option.icon className="h-6 w-6" />
@@ -203,8 +106,8 @@ const InventoryGrid = ({ setView }) => {
                             </p>
                         </div>
                         <div
-                            className="mt-4 flex items-center text-sm font-medium 
-              text-amber-500 transition-all 
+                            className="mt-4 flex items-center text-sm font-medium
+              text-amber-500 transition-all
               group-hover:translate-x-1 group-hover:text-amber-400"
                         >
                             Go to section <ArrowRight className="ml-1.5 h-4 w-4" />
@@ -254,139 +157,187 @@ const ManageProductsView = ({ setView }) => {
 };
 
 // --- 3. Add New Stock View ---
+// --- 3. Add New Stock View ---
 const AddStockView = ({ setView }) => {
-    const [formData, setFormData] = useState({
-        productName: '',
-        category: 'Produce',
-        count: '',
-        cost: '',
-        expiryDate: '',
-    });
+  const [formData, setFormData] = useState({
+    productName: '',
+    category: 'Produce',
+    count: '',
+    cost: '',
+    expiryDate: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false); // popup flag
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const qty = Number(formData.count);
+    const price = Number(formData.cost);
+    if (!formData.productName.trim() || qty <= 0 || price <= 0) {
+      alert('Please enter valid details');
+      return;
+    }
+
+    const payload = {
+      sku:
+        `${formData.productName}`.trim().toUpperCase().replace(/\s+/g, '-') +
+        '-' +
+        Date.now(),
+      name: formData.productName.trim(),
+      quantity: qty,
+      unitPrice: price,
+      description: formData.expiryDate
+        ? `Expiry: ${formData.expiryDate}`
+        : '',
+      category: formData.category,
+      location: 'A1',
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        console.log('Submitting new stock:', formData);
-        // Simulate API call
-        alert('New stock submitted! (See console for data)');
-        setView('main'); // Go back to grid
-    };
+    try {
+      setSubmitting(true);
+      await api.post('/api/inventory', payload);
+      setShowSuccess(true); // open modal instead of alert
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.response?.statusText ||
+        err?.message ||
+        'Submission failed';
+      alert(`Failed to submit: ${msg}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    const inputClass =
-        'mt-1 block w-full rounded-lg border-white/20 bg-white/5 p-3 text-white shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500/50';
+  const inputClass =
+    'mt-1 block w-full rounded-lg border-white/20 bg-white/5 p-3 text-white shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500/50';
 
-    return (
-        <div className="animate-fadeIn">
-            <SubPageHeader title="Add New Stock" onBack={() => setView('main')} />
-            <div className="rounded-xl bg-[#29190D]/70 p-6 shadow-lg shadow-black/30 backdrop-blur-sm">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label
-                            htmlFor="productName"
-                            className="block text-sm font-medium text-gray-300"
-                        >
-                            Product Name
-                        </label>
-                        <input
-                            type="text"
-                            name="productName"
-                            id="productName"
-                            value={formData.productName}
-                            onChange={handleChange}
-                            className={inputClass}
-                            required
-                        />
-                    </div>
-                    <div>
-                        <label
-                            htmlFor="category"
-                            className="block text-sm font-medium text-gray-300"
-                        >
-                            Category
-                        </label>
-                        <select
-                            name="category"
-                            id="category"
-                            value={formData.category}
-                            onChange={handleChange}
-                            className={inputClass}
-                        >
-                            <option>Produce</option>
-                            <option>Dairy</option>
-                            <option>Bakery</option>
-                            <option>Pantry</option>
-                            <option>Frozen</option>
-                        </select>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <div>
-                            <label
-                                htmlFor="count"
-                                className="block text-sm font-medium text-gray-300"
-                            >
-                                Count
-                            </label>
-                            <input
-                                type="number"
-                                name="count"
-                                id="count"
-                                value={formData.count}
-                                onChange={handleChange}
-                                className={inputClass}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label
-                                htmlFor="cost"
-                                className="block text-sm font-medium text-gray-300"
-                            >
-                                Total Cost
-                            </label>
-                            <input
-                                type="number"
-                                name="cost"
-                                id="cost"
-                                step="0.01"
-                                value={formData.cost}
-                                onChange={handleChange}
-                                className={inputClass}
-                                required
-                            />
-                        </div>
-                        <div>
-                            <label
-                                htmlFor="expiryDate"
-                                className="block text-sm font-medium text-gray-300"
-                            >
-                                Expiry Date
-                            </label>
-                            <input
-                                type="date"
-                                name="expiryDate"
-                                id="expiryDate"
-                                value={formData.expiryDate}
-                                onChange={handleChange}
-                                className={`${inputClass} [color-scheme:dark]`}
-                            />
-                        </div>
-                    </div>
-                    <div className="pt-4 text-right">
-                        <button
-                            type="submit"
-                            className="rounded-lg bg-amber-600 px-5 py-2.5 font-medium text-white shadow-md transition hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                        >
-                            Submit New Stock
-                        </button>
-                    </div>
-                </form>
+  return (
+    <div className="animate-fadeIn">
+      <SubPageHeader title="Add New Stock" onBack={() => setView('main')} />
+      <div className="rounded-xl bg-[#29190D]/70 p-6 shadow-lg shadow-black/30 backdrop-blur-sm">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300">
+              Product Name
+            </label>
+            <input
+              type="text"
+              name="productName"
+              value={formData.productName}
+              onChange={handleChange}
+              className={inputClass}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300">
+              Category
+            </label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              className={inputClass}
+            >
+              <option>Produce</option>
+              <option>Dairy</option>
+              <option>Bakery</option>
+              <option>Pantry</option>
+              <option>Frozen</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-300">
+                Count
+              </label>
+              <input
+                type="number"
+                name="count"
+                value={formData.count}
+                onChange={handleChange}
+                className={inputClass}
+                required
+              />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300">
+                Total Cost
+              </label>
+              <input
+                type="number"
+                name="cost"
+                step="0.01"
+                value={formData.cost}
+                onChange={handleChange}
+                className={inputClass}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300">
+                Expiry Date
+              </label>
+              <input
+                type="date"
+                name="expiryDate"
+                value={formData.expiryDate}
+                onChange={handleChange}
+                className={`${inputClass} [color-scheme:dark]`}
+              />
+            </div>
+          </div>
+          <div className="pt-4 text-right">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-lg bg-amber-600 px-5 py-2.5 font-medium text-white shadow-md transition hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500/50 disabled:opacity-60"
+            >
+              {submitting ? 'Submitting...' : 'Submit New Stock'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Success popup modal */}
+      <Dialog open={showSuccess} onClose={() => setShowSuccess(false)} className="relative z-50">
+        <div className="fixed inset-0 bg-black/50" aria-hidden="true" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="max-w-md w-full rounded-2xl bg-[#1f120a] p-6 text-white shadow-xl border border-amber-500/30">
+            <Dialog.Title className="text-xl font-semibold text-amber-400">
+              New Stock Submitted!
+            </Dialog.Title>
+            <p className="mt-2 text-gray-300">
+              Your new stock <strong>{formData.productName}</strong> has been successfully submitted.
+            </p>
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowSuccess(false)}
+                className="rounded-md bg-gray-700 px-4 py-2 hover:bg-gray-600"
+              >
+                Close
+              </button>
+              <NavLink to="/my-submissions">
+              <button
+                onClick={() => setView('MySubmissions')}
+                className="rounded-md bg-amber-600 px-4 py-2 font-medium hover:bg-amber-700"
+              >
+                View My Submissions
+              </button>
+                </NavLink>
+            </div>
+          </Dialog.Panel>
         </div>
-    );
+      </Dialog>
+    </div>
+  );
 };
 
 // --- 4. Manage Categories View ---
@@ -475,7 +426,7 @@ const UploadFileView = ({ setView }) => {
             />
             <div className="rounded-xl bg-[#29190D]/70 p-6 text-center shadow-lg shadow-black/30 backdrop-blur-sm">
                 <div
-                    className="relative mt-4 flex justify-center rounded-lg border-2 
+                    className="relative mt-4 flex justify-center rounded-lg border-2
           border-dashed border-white/25 px-6 pb-10 pt-8"
                 >
                     <div className="text-center">
@@ -561,7 +512,7 @@ const BarcodeView = ({ setView }) => {
                         value={productId}
                         onChange={(e) => setProductId(e.target.value)}
                         placeholder="Enter Product ID (e.g., P1001)"
-                        className="block w-full rounded-lg border-white/20 bg-white/5 p-3 text-white 
+                        className="block w-full rounded-lg border-white/20 bg-white/5 p-3 text-white
               shadow-sm focus:border-amber-500 focus:ring focus:ring-amber-500/50"
                         required
                     />

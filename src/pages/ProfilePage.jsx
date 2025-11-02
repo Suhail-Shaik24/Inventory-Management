@@ -1,5 +1,6 @@
 import PageHeader from '../components/PageHeader';
 import { LogOut, ShieldCheck } from 'lucide-react';
+import {NavLink} from "react-router-dom";
 
 export default function ProfilePage() {
     const handleSignOut = () => {
@@ -31,6 +32,7 @@ export default function ProfilePage() {
                                 Current Role: <span className="font-medium text-white">Admin</span>
                             </span>
                         </div>
+                        <NavLink to="/login">
                         <button
                             onClick={handleSignOut}
                             className="mt-6 flex w-full items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-500"
@@ -38,6 +40,7 @@ export default function ProfilePage() {
                             <LogOut className="mr-2 h-4 w-4" />
                             Sign Out
                         </button>
+                        </NavLink>
                     </div>
                 </div>
             </div>

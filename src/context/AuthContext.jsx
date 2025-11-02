@@ -1,52 +1,37 @@
-import { createContext, useContext, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// 'src/context/AuthContext.jsx'
+import React, { createContext, useContext, useMemo, useState } from "react";
+import { api } from "../api/client";
 
-// --- Create Context ---
 const AuthContext = createContext(null);
 
-/**
- * AuthProvider Component
- * Wraps the app to provide authentication state and functions.
- */
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const navigate = useNavigate();
+  // No localStorage; rely on backend cookie
+  const [user, setUser] = useState(null);
 
-    // --- Login Function ---
-    // Now accepts a user object, which will be provided by the login page after its API call
-    const login = (userData) => {
-        setUser(userData);
-        // Note: Navigation is now handled by the LoginPage on successful login
-    };
+  const login = async (username, password) => {
+    const { data } = await api.post("/api/auth/token/login", { username, password });
+    setUser(data.user || null);
+    return data;
+  };
 
-    // --- Logout Function ---
-    const logout = () => {
-        setUser(null);
-        navigate('/login'); // Redirect to login page after logout
-    };
+  const signup = async (payload) => {
+    const { data } = await api.post("/api/auth/token/signup", payload);
+    setUser(data.user || null);
+    return data;
+  };
 
-    const isAuthenticated = !!user;
+  const logout = () => {
+    setUser(null);
+  };
 
-    // --- Context Value ---
-    const value = {
-        user,
-        isAuthenticated,
-        login,
-        logout,
-    };
+  const hasRole = (roles = []) => {
+    if (!user?.role) return false;
+    const r = String(user.role).toLowerCase();
+    return roles.map((x) => String(x).toLowerCase()).includes(r);
+  };
 
-    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const value = useMemo(() => ({ user, login, signup, logout, hasRole }), [user]);
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-/**
- * useAuth Custom Hook
- * A simple hook for components to consume the auth context.
- */
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
-};
-
+export const useAuth = () => useContext(AuthContext);

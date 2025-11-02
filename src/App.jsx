@@ -1,5 +1,3 @@
-
-
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 // Import the main layout and all the pages
@@ -13,11 +11,12 @@ import ThresholdsPage from './pages/ThresholdsPage';
 import ProfilePage from './pages/ProfilePage';
 import Login from './pages/Login';
 import InventoryPage from './pages/InventoryPage';
-import Signup from './pages/SpoilagePage';
+import Signup from './pages/Signup';
 
 import MakerDashboard from './dashboards/MakerDashboard';
 import CheckerDashboard from './dashboards/CheckerDashboard';
 import ManagerDashboard from './dashboards/ManagerDashboard';
+import MySubmissions from './pages/MySubmissions';
 
 const router = createBrowserRouter([
   {
@@ -32,6 +31,10 @@ const router = createBrowserRouter([
       {
         path: 'DashboardMaker',
         element: <MakerDashboard />,
+      },
+      {
+        path: 'my-submissions',
+        element: <MySubmissions />,
       },
       {
         path: 'DashboardChecker',
@@ -86,5 +89,3 @@ export default function App() {
     <RouterProvider router={router} />
   )
 };
-
-
