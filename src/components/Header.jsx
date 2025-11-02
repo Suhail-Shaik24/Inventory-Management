@@ -1,7 +1,7 @@
 import { useState, Fragment } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu as HeadlessMenu, Transition } from '@headlessui/react';
-import { Menu, LogOut, User, Settings, ShieldCheck } from 'lucide-react';
+import { Menu, LogOut, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 // Mock data for alerts dropdown (can be moved or fetched)
 const alertData = [
@@ -128,17 +128,6 @@ const Header = ({ setIsMobileOpen }) => {
                                     </Link>
                                 )}
                             </HeadlessMenu.Item>
-                            <HeadlessMenu.Item>
-                                {({ active }) => (
-                                    <button
-                                        className={`${active ? 'bg-white/10' : ''
-                                            } group flex w-full items-center rounded-md px-3 py-2 text-sm text-gray-200`}
-                                    >
-                                        <Settings className="mr-2 h-5 w-5" />
-                                        Settings
-                                    </button>
-                                )}
-                            </HeadlessMenu.Item>
                         </div>
                         <div className="p-1">
                             <HeadlessMenu.Item>
@@ -162,3 +151,4 @@ const Header = ({ setIsMobileOpen }) => {
 };
 
 export default Header;
+
