@@ -1,7 +1,8 @@
 import { useState, Fragment } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu as HeadlessMenu, Transition } from '@headlessui/react';
 import { Menu, LogOut, User, Settings, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext.jsx';
 // Mock data for alerts dropdown (can be moved or fetched)
 const alertData = [
     {
@@ -22,18 +23,27 @@ const alertData = [
 const Header = ({ setIsMobileOpen }) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isAlertsOpen, setIsAlertsOpen] = useState(false);
+    const navigate = useNavigate();
+    const { user, logout } = useAuth();
 
     const handleSignOut = () => {
-        // In a real app, this would clear auth tokens, context, etc.
-        console.log('User signed out');
+        logout();
         setIsProfileOpen(false);
-        // Here you might redirect to a login page
+        navigate('/login');
     };
-    const user = {
-        name: 'Alex Chen',
-        role: 'Inventory Manager',
-        avatar: `https://placehold.co/256x256/EAB308/1C1917?text=AC`,
-    };
+
+    // Derive display name and role from backend user object
+    const displayName = user?.username || user?.name || 'User';
+    const displayRole = user?.role
+        ? String(user.role).charAt(0).toUpperCase() + String(user.role).slice(1).toLowerCase()
+        : 'Signed out';
+    const avatarText = (displayName || 'U')
+        .split(' ')
+        .map((p) => p[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+    const avatar = `https://placehold.co/256x256/EAB308/1C1917?text=${encodeURIComponent(avatarText)}`;
 
     const location = useLocation();
     const pageTitles = {
@@ -45,6 +55,8 @@ const Header = ({ setIsMobileOpen }) => {
         '/invoices': 'Invoice Management',
         '/thresholds': 'Stock Thresholds',
         '/profile': 'Profile',
+        '/DashboardMaker': 'Maker Dashboard',
+        '/DashboardChecker': 'Checker Dashboard',
     };
     // Default to 'Dashboard' if the path isn't recognized
     const currentPageTitle = pageTitles[location.pathname] || 'Dashboard';
@@ -73,16 +85,16 @@ const Header = ({ setIsMobileOpen }) => {
                     <HeadlessMenu.Button className="flex items-center space-x-3 rounded-full p-1.5 transition-all hover:bg-white/10">
                         <img
                             className="h-9 w-9 rounded-full object-cover"
-                            src={user.avatar}
+                            src={avatar}
                             alt="User avatar"
                             onError={(e) =>
                             (e.currentTarget.src =
-                                'https://placehold.co/256x256/EAB308/1C1917?text=AC')
+                                'https://placehold.co/256x256/EAB308/1C1917?text=U')
                             }
                         />
                         <div className="hidden text-left md:block">
-                            <div className="text-sm font-medium text-white">{user.name}</div>
-                            <div className="text-xs text-gray-400">{user.role}</div>
+                            <div className="text-sm font-medium text-white">{displayName}</div>
+                            <div className="text-xs text-gray-400">{displayRole}</div>
                         </div>
                     </HeadlessMenu.Button>
                 </div>
@@ -100,9 +112,9 @@ const Header = ({ setIsMobileOpen }) => {
                             {/* Profile Info in Dropdown (for mobile) */}
                             <div className="px-3 py-2 md:hidden">
                                 <div className="text-sm font-medium text-white">
-                                    {user.name}
+                                    {displayName}
                                 </div>
-                                <div className="text-xs text-gray-400">{user.role}</div>
+                                <div className="text-xs text-gray-400">{displayRole}</div>
                             </div>
                             <HeadlessMenu.Item>
                                 {({ active }) => (
@@ -132,7 +144,7 @@ const Header = ({ setIsMobileOpen }) => {
                             <HeadlessMenu.Item>
                                 {({ active }) => (
                                     <button
-                                        onClick={() => console.log('Sign Out')}
+                                        onClick={handleSignOut}
                                         className={`${active ? 'bg-red-500/20 text-red-400' : 'text-red-400'
                                             } group flex w-full items-center rounded-md px-3 py-2 text-sm`}
                                     >

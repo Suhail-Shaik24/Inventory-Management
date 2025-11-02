@@ -2,26 +2,23 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Full_Logo } from "../assets";
 import { ArrowRight } from "lucide-react";
-import { api } from "../api/client";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
 
     try {
       // Backend expects username + password; we will treat email as username
-      const { data } = await api.post("/api/auth/token/login", {
-        username: email,
-        password,
-      });
+      const data = await login(email, password);
 
-      // No localStorage persistence: backend sets HttpOnly cookie for auth
-      // Use response's role just for immediate navigation
-      const role = (data.user?.role || "").toLowerCase();
+      // Navigate by role from response
+      const role = (data?.user?.role || "").toLowerCase();
       switch (role) {
         case "admin":
           navigate("/");
