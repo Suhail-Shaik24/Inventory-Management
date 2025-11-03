@@ -282,14 +282,6 @@ Notes:
 - Ensure CORS is enabled for the frontend origin.
 - On Windows, run commands in PowerShell or Git Bash; services run on the same ports.
 
-## Screenshots / UI Preview
-Place screenshots under `docs/images/`:
-- `docs/images/login.png` \- Login page
-- `docs/images/manager-dashboard.png` \- Manager dashboard with charts
-- `docs/images/checker-queue.png` \- Checker approval queue
-- `docs/images/inventory-grid.png` \- Inventory listing
-- `docs/images/reports.png` \- Reports page
-
 ## Future Enhancements
 - Export analytics and reports to CSV/XLSX/PDF
 - Barcode/QR scanning for fast item lookup and movement
