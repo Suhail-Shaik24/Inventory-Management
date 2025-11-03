@@ -49,18 +49,7 @@ const InventoryGrid = ({ setView }) => {
             icon: PlusSquare,
             view: 'addStock',
         },
-        {
-            title: 'Manage Categories',
-            description: 'Organize products into categories.',
-            icon: LayoutGrid,
-            view: 'manageCategories',
-        },
-        {
-            title: 'Suppliers',
-            description: 'View and manage supplier details.',
-            icon: Truck,
-            view: 'suppliers',
-        },
+        
         {
             title: 'Upload Inventory File',
             description: 'Bulk upload stock via CSV/file feed.',
@@ -338,62 +327,6 @@ const AddStockView = ({ setView }) => {
       </Dialog>
     </div>
   );
-};
-
-// --- 4. Manage Categories View ---
-const ManageCategoriesView = ({ setView }) => {
-    const mockCategories = ['Produce', 'Dairy', 'Bakery', 'Pantry', 'Frozen', 'Meat'];
-    return (
-        <div className="animate-fadeIn">
-            <SubPageHeader
-                title="Manage Categories"
-                onBack={() => setView('main')}
-            />
-            <div className="rounded-xl bg-[#29190D]/70 p-6 shadow-lg shadow-black/30 backdrop-blur-sm">
-                <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                    {mockCategories.map((cat) => (
-                        <li
-                            key={cat}
-                            className="flex items-center rounded-lg bg-white/10 p-4"
-                        >
-                            <List className="mr-3 h-5 w-5 text-amber-500" />
-                            <span className="font-medium text-white">{cat}</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
-    );
-};
-
-// --- 5. Suppliers View ---
-const SuppliersView = ({ setView }) => {
-    const mockSuppliers = [
-        { id: 'S001', name: 'Fresh Farms Inc.', contact: 'info@freshfarms.com' },
-        { id: 'S002', name: 'DairyBest', contact: 'sales@dairybest.com' },
-        { id: 'S003', name: 'Global Foods Ltd.', contact: 'orders@global.com' },
-    ];
-    return (
-        <div className="animate-fadeIn">
-            <SubPageHeader title="Manage Suppliers" onBack={() => setView('main')} />
-            <div className="overflow-hidden rounded-xl bg-[#29190D]/70 shadow-lg shadow-black/30 backdrop-blur-sm">
-                <ul className="divide-y divide-white/10">
-                    {mockSuppliers.map((supplier) => (
-                        <li
-                            key={supplier.id}
-                            className="flex items-center justify-between p-4"
-                        >
-                            <div>
-                                <p className="font-semibold text-white">{supplier.name}</p>
-                                <p className="text-sm text-gray-400">{supplier.contact}</p>
-                            </div>
-                            <User className="h-5 w-5 text-gray-500" />
-                        </li>
-                    ))}
-                </ul>
-            </div>
-        </div>
-    );
 };
 
 // --- 6. Upload File View ---

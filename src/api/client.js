@@ -9,6 +9,12 @@ export const api = axios.create({
   withCredentials: true, // send/receive cookies
 });
 
+// Attach Authorization header if set by AuthContext
+api.interceptors.request.use((config) => {
+  // config.headers.Authorization may already be set via defaults; ensure not overwritten incorrectly
+  return config;
+});
+
 // No Authorization header from localStorage; backend reads token from HttpOnly cookie
 // Keep a minimal response handler
 api.interceptors.response.use(

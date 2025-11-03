@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext.jsx';
 import {
     UserCheck,
     FileCheck,
@@ -10,6 +12,8 @@ import {
     X,
 } from 'lucide-react';
 import StatCard from '../components/StatCard';
+import ConfirmModal from '../components/ConfirmModal.jsx';
+import useBackGuard from '../hooks/useBackGuard.jsx';
 
 /**
  * CheckerDashboard Component
@@ -23,6 +27,12 @@ const CheckerDashboard = () => {
     const [acting, setActing] = useState(new Set()); // ids being approved/rejected
     const [reviewItem, setReviewItem] = useState(null);
     const [reviewOpen, setReviewOpen] = useState(false);
+    const [pageSize, setPageSize] = useState(10);
+    const [page, setPage] = useState(1); // 1-based
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const { confirmOpen, onConfirm, onCancel } = useBackGuard({ allowedRoles: ['checker'], stayPath: '/DashboardChecker' });
 
     const loadPending = async () => {
         try {
@@ -30,8 +40,8 @@ const CheckerDashboard = () => {
             setPending(Array.isArray(data) ? data : []);
         } catch (err) {
             const status = err?.response?.status;
-            if (status === 401) alert('Please login as Checker/Admin to view pending items.');
-            else if (status === 403) alert('Access denied: Checker/Admin only.');
+            if (status === 401) alert('Please login as Checker/Manager to view pending items.');
+            else if (status === 403) alert('Access denied: Checker/Manager only.');
             else console.warn('Pending load failed:', err?.response?.data || err?.message);
         }
     };
@@ -56,6 +66,18 @@ const CheckerDashboard = () => {
     useEffect(() => {
         loadAll();
     }, []);
+
+    // clamp page when list or pageSize changes
+    useEffect(() => {
+        const total = Math.max(1, Math.ceil((recent?.length || 0) / pageSize));
+        if (page > total) setPage(total);
+    }, [recent, pageSize]);
+
+    // Derived pagination values
+    const totalPages = Math.max(1, Math.ceil((recent?.length || 0) / pageSize));
+    const startIdx = (page - 1) * pageSize;
+    const endIdx = startIdx + pageSize;
+    const pagedRecent = recent.slice(startIdx, endIdx);
 
     // Periodic refresh to keep lists up-to-date if others act concurrently
     useEffect(() => {
@@ -109,6 +131,15 @@ const CheckerDashboard = () => {
 
     return (
         <div className="animate-fadeIn">
+            <ConfirmModal
+                open={confirmOpen}
+                title="Leave Dashboard?"
+                message="Are you sure you want to log out and return to the login page?"
+                confirmText="Log Out"
+                cancelText="Stay"
+                onConfirm={onConfirm}
+                onCancel={onCancel}
+            />
             <PageHeader
                 title="Welcome, Checker!"
                 description="Review pending submissions and see recent updates."
@@ -267,7 +298,7 @@ const CheckerDashboard = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-white/10">
-                            {recent.map((item) => (
+                            {pagedRecent.map((item) => (
                                 <tr key={item.id} className="hover:bg-black/10">
                                     <td className="px-6 py-4 text-sm font-medium text-white">
                                         {item.id}
@@ -299,6 +330,44 @@ const CheckerDashboard = () => {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination controls */}
+                {recent.length > 0 && (
+                    <div className="flex flex-col gap-3 px-6 py-3 border-t border-white/10 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="text-sm text-gray-300">
+                            Showing {recent.length ? startIdx + 1 : 0}-{Math.min(endIdx, recent.length)} of {recent.length}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm text-gray-300">Rows per page</label>
+                            <select
+                                value={pageSize}
+                                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                                className="rounded-md bg-white/10 px-2 py-1 text-sm text-white ring-1 ring-white/10 focus:outline-none focus:ring-amber-500/50"
+                            >
+                                <option value={5}>5</option>
+                                <option value={10}>10</option>
+                                <option value={20}>20</option>
+                            </select>
+                            <div className="hidden text-sm text-gray-300 sm:block">Page {page} of {totalPages}</div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    disabled={page <= 1}
+                                    className="rounded-md border border-white/10 px-3 py-1 text-sm text-white/90 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    Prev
+                                </button>
+                                <button
+                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={page >= totalPages}
+                                    className="rounded-md bg-amber-600 px-3 py-1 text-sm font-medium text-black hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    Next
+                                </button>
+                        </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* --- Review Item Modal --- */}

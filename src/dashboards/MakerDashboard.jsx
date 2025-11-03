@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext.jsx';
 import {
     ArrowRight,
     PlusSquare,
@@ -9,6 +11,8 @@ import {
     Box,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import ConfirmModal from '../components/ConfirmModal.jsx';
+import useBackGuard from '../hooks/useBackGuard.jsx';
 
 // Quick Action Card Component
 const ActionCard = ({ title, description, icon: Icon, href }) => (
@@ -41,6 +45,9 @@ const statusColor = {
 const MakerDashboard = () => {
     const [recent, setRecent] = useState([]);
     const [loading, setLoading] = useState(false);
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const { confirmOpen, onConfirm, onCancel } = useBackGuard({ allowedRoles: ['maker'], stayPath: '/DashboardMaker' });
 
     const loadRecent = async () => {
         try {
@@ -49,7 +56,7 @@ const MakerDashboard = () => {
             setRecent(Array.isArray(data) ? data : []);
         } catch (err) {
             const status = err?.response?.status;
-            if (status === 401) console.warn('Please log in as Maker/Admin to see your submissions.');
+            if (status === 401) console.warn('Please log in as Maker/Manager to see your submissions.');
             else console.warn('Failed to load recent submissions:', err?.response?.data || err?.message);
         } finally {
             setLoading(false);
@@ -62,6 +69,15 @@ const MakerDashboard = () => {
 
     return (
         <div className="animate-fadeIn">
+            <ConfirmModal
+                open={confirmOpen}
+                title="Leave Dashboard?"
+                message="Are you sure you want to log out and return to the login page?"
+                confirmText="Log Out"
+                cancelText="Stay"
+                onConfirm={onConfirm}
+                onCancel={onCancel}
+            />
             <PageHeader title="Welcome, Maker!" description="Ready to add new inventory? Start here." />
 
             {/* --- Quick Actions --- */}

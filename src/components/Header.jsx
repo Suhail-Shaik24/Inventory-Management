@@ -29,7 +29,7 @@ const Header = ({ setIsMobileOpen }) => {
     const handleSignOut = () => {
         logout();
         setIsProfileOpen(false);
-        navigate('/login');
+        navigate('/login', { replace: true });
     };
 
     // Derive display name and role from backend user object
@@ -57,6 +57,7 @@ const Header = ({ setIsMobileOpen }) => {
         '/profile': 'Profile',
         '/DashboardMaker': 'Maker Dashboard',
         '/DashboardChecker': 'Checker Dashboard',
+        '/manager-dashboard': 'Manager Dashboard',
     };
     // Default to 'Dashboard' if the path isn't recognized
     const currentPageTitle = pageTitles[location.pathname] || 'Dashboard';
@@ -151,4 +152,3 @@ const Header = ({ setIsMobileOpen }) => {
 };
 
 export default Header;
-

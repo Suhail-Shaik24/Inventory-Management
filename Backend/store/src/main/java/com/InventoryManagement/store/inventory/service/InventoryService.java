@@ -2,6 +2,7 @@ package com.InventoryManagement.store.inventory.service;
 
 import com.InventoryManagement.store.inventory.dto.CreateInventoryRequest;
 import com.InventoryManagement.store.inventory.dto.InventoryResponse;
+import com.InventoryManagement.store.inventory.dto.InventoryStatsDto;
 
 import java.util.List;
 
@@ -14,4 +15,5 @@ public interface InventoryService {
     List<InventoryResponse> listRecentByUser(String createdBy);
     List<InventoryResponse> listAllByUser(String createdBy);
     InventoryResponse get(long id);
+    InventoryStatsDto stats();
 }

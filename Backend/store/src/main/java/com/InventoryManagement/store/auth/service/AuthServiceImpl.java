@@ -52,19 +52,21 @@ public class AuthServiceImpl implements AuthService {
         // Block duplicates by username or email
         if (userRepository.findByUsername(request.getUsername()).isPresent()) return null;
         if (request.getEmail() != null && userRepository.findByEmail(request.getEmail()).isPresent()) return null;
-        String role = normalizeRole(request.getRole());
+        String role = canonicalRole(request.getRole());
         User newUser = new User(request.getUsername(), request.getEmail(), request.getPassword(), role);
         User saved = userRepository.saveAndFlush(newUser);
         String token = jwtUtil.generateToken(saved.getUsername());
         return new LoginResponse(token, saved);
     }
 
-    private String normalizeRole(String role) {
-        if (role == null || role.isBlank()) return "maker";
-        String r = role.trim().toLowerCase();
+    // Persist uppercase role names; accept legacy/variant inputs.
+    private String canonicalRole(String role) {
+        if (role == null || role.isBlank()) return "MAKER";
+        String r = role.trim().toUpperCase();
         return switch (r) {
-            case "maker", "checker", "admin", "user" -> r;
-            default -> "user";
+            case "MAKER", "CHECKER", "MANAGER", "USER" -> r;
+            case "ADMIN" -> "MANAGER"; // legacy admin maps to MANAGER
+            default -> "USER";
         };
     }
 

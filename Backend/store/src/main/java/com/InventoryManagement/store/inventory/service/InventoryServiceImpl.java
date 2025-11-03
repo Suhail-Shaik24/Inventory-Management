@@ -2,9 +2,12 @@ package com.InventoryManagement.store.inventory.service;
 
 import com.InventoryManagement.store.inventory.dto.CreateInventoryRequest;
 import com.InventoryManagement.store.inventory.dto.InventoryResponse;
+import com.InventoryManagement.store.inventory.dto.InventoryStatsDto;
+import com.InventoryManagement.store.inventory.dto.CategorySliceDto;
 import com.InventoryManagement.store.inventory.entity.InventoryItem;
 import com.InventoryManagement.store.inventory.entity.InventoryStatus;
 import com.InventoryManagement.store.inventory.repository.InventoryItemRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -162,6 +166,34 @@ public class InventoryServiceImpl implements InventoryService {
         InventoryItem item = repo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item not found"));
         return toResponse(item);
+    }
+
+    @Override
+    public InventoryStatsDto stats() {
+        long approved = repo.countByStatus(InventoryStatus.APPROVED);
+        long pending = repo.countByStatus(InventoryStatus.PENDING);
+        long rejected = repo.countByStatus(InventoryStatus.REJECTED);
+
+        List<CategorySliceDto> categories = repo.aggregateByCategory().stream()
+                .map(a -> new CategorySliceDto(a.getCategory() == null ? "Uncategorized" : a.getCategory(), a.getTotal() == null ? 0L : a.getTotal()))
+                .collect(Collectors.toList());
+
+        InventoryStatsDto out = new InventoryStatsDto(approved, pending, rejected, categories);
+        // New analytics
+        Instant now = Instant.now();
+        out.setExpired(repo.countExpiredBefore(now));
+        out.setDamaged(repo.countDamaged());
+        int threshold = 10; // could externalize
+        out.setLowStock(repo.countLowStock(threshold));
+        out.setNearExpiring(repo.countExpiringBetween(now, now.plus(7, ChronoUnit.DAYS)));
+        List<Object[]> points = repo.lowStockTrend(threshold, PageRequest.of(0, 30));
+        out.setLowStockTrend(points.stream().map(o -> {
+            InventoryStatsDto.TrendPoint p = new InventoryStatsDto.TrendPoint();
+            p.day = String.valueOf(o[0]);
+            p.count = o[1] == null ? 0L : ((Number) o[1]).longValue();
+            return p;
+        }).collect(Collectors.toList()));
+        return out;
     }
 
     private InventoryResponse toResponse(InventoryItem i) {

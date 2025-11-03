@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import ConfirmModal from "../components/ConfirmModal.jsx";
 
 export default function SignUp() {
   const [username, setUsername] = useState("");
@@ -9,6 +10,7 @@ export default function SignUp() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("Maker");
   const [loading, setLoading] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
   const navigate = useNavigate();
 
   const submitTo = async (path, payload) => api.post(path, payload);
@@ -20,11 +22,15 @@ export default function SignUp() {
       return;
     }
 
+    // Map UI role to backend expected values
+    const roleUpper = role.toUpperCase();
+    const backendRole = roleUpper === 'ADMIN' ? 'MANAGER' : roleUpper; // legacy guard
+
     const payload = {
       username: username.trim(),
       email: email.trim(),
       password,
-      role: role.toLowerCase(),
+      role: backendRole, // send UPPERCASE so DB stores MANAGER/MAKER/CHECKER
     };
 
     try {
@@ -39,10 +45,8 @@ export default function SignUp() {
           throw err;
         }
       }
-
-      // On success, go to login page
-      alert("Signup successful! Please log in.");
-      navigate("/login");
+      // On success, open success modal; navigation from the modal button
+      setSuccessOpen(true);
     } catch (err) {
       const status = err?.response?.status;
       if (status === 409) {
@@ -61,76 +65,89 @@ export default function SignUp() {
   };
 
   return (
-    <div className="flex justify-center items-center h-screen bg-gray-50">
-      <div className="bg-white shadow-lg rounded-2xl p-8 w-full max-w-md">
-        <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">Create Account</h2>
+    <div className="flex items-center justify-center w-full min-h-screen bg-loginImage">
+      {/* Success Modal */}
+      <ConfirmModal
+        open={successOpen}
+        title="Signup successful"
+        message="Signup successful! Please proceed to the login page."
+        confirmText="Go to Login"
+        cancelText="Close"
+        onConfirm={() => {
+          setSuccessOpen(false);
+          navigate("/login", { replace: true });
+        }}
+        onCancel={() => setSuccessOpen(false)}
+      />
+      <div className="w-full max-w-md rounded-2xl bg-[#29190D]/80 p-8 shadow-2xl shadow-black/40 ring-1 ring-white/10 backdrop-blur">
+        <div className="mb-6 text-center">
+          <h2 className="text-2xl font-bold text-white">Create your account</h2>
+          <p className="mt-1 text-sm text-white/70">Join the inventory platform and start managing stock.</p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-gray-600 font-medium mb-1">Username</label>
+            <label className="mb-1 block text-sm font-medium text-white/80">Username</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#864E25] outline-none"
+              className="w-full rounded-lg bg-white/10 px-4 py-2 text-white placeholder-white/40 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500/60"
               placeholder="Choose a unique username"
             />
           </div>
 
           <div>
-            <label className="block text-gray-600 font-medium mb-1">Email</label>
+            <label className="mb-1 block text-sm font-medium text-white/80">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#864E25] outline-none"
+              className="w-full rounded-lg bg-white/10 px-4 py-2 text-white placeholder-white/40 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500/60"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-gray-600 font-medium mb-1">Password</label>
+            <label className="mb-1 block text-sm font-medium text-white/80">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#864E25] outline-none"
+              className="w-full rounded-lg bg-white/10 px-4 py-2 text-white placeholder-white/40 ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500/60"
               placeholder="Enter a strong password"
             />
           </div>
 
           <div>
-            <label className="block text-gray-600 font-medium mb-1">Role</label>
+            <label className="mb-1 block text-sm font-medium text-white/80">Role</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#864E25] outline-none"
+              className="w-full rounded-lg bg-white/10 px-4 py-2 text-white ring-1 ring-white/10 focus:outline-none focus:ring-2 focus:ring-amber-500/60"
             >
-              <option value="Admin">Admin</option>
-              <option value="Maker">Maker</option>
-              <option value="Checker">Checker</option>
+              <option className="bg-[#29190D]" value="Manager">Manager</option>
+              <option className="bg-[#29190D]" value="Maker">Maker</option>
+              <option className="bg-[#29190D]" value="Checker">Checker</option>
             </select>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#864E25] hover:bg-[#6f3f1d] text-white py-2 rounded-lg font-semibold transition duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full rounded-lg bg-amber-600 py-2 font-semibold text-black transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Signing up..." : "Sign Up"}
           </button>
 
-          <p className="text-center text-sm text-gray-600 mt-3">
+          <p className="mt-3 text-center text-sm text-white/80">
             Already have an account?{" "}
-            <span
-              onClick={() => navigate("/login")}
-              className="text-[#864E25] cursor-pointer hover:underline"
-            >
+            <button type="button" onClick={() => navigate("/login")} className="text-amber-400 hover:underline">
               Log in
-            </span>
+            </button>
           </p>
         </form>
       </div>

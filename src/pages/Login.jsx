@@ -1,14 +1,41 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Full_Logo } from "../assets";
 import { ArrowRight } from "lucide-react";
 import { useAuth } from "../context/AuthContext.jsx";
+import ConfirmModal from "../components/ConfirmModal.jsx";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showConfirm, setShowConfirm] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user, logout } = useAuth();
+
+  // Back-button protection: if user is already authenticated and reaches /login,
+  // ask for confirmation to logout; if cancelled, send back to their dashboard.
+  useEffect(() => {
+    if (!user) return;
+    setShowConfirm(true);
+
+    // Prevent navigating back to previous dashboard entries while modal is open
+    const url = window.location.href;
+    window.history.pushState({ guard: 'login' }, '', url);
+    const onPopState = () => {
+      window.history.pushState({ guard: 'login' }, '', url);
+      setShowConfirm(true);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const navigateToRole = (role) => {
+    const r = String(role || "").toLowerCase();
+    if (r === "maker") navigate("/DashboardMaker", { replace: true });
+    else if (r === "checker") navigate("/DashboardChecker", { replace: true });
+    else navigate("/manager-dashboard", { replace: true });
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -20,17 +47,18 @@ const Login = () => {
       // Navigate by role from response
       const role = (data?.user?.role || "").toLowerCase();
       switch (role) {
-        case "admin":
-          navigate("/");
-          break;
         case "maker":
-          navigate("/DashboardMaker");
+          navigate("/DashboardMaker", { replace: true });
           break;
         case "checker":
-          navigate("/DashboardChecker");
+          navigate("/DashboardChecker", { replace: true });
+          break;
+        case "admin":
+        case "manager":
+          navigate("/manager-dashboard", { replace: true });
           break;
         default:
-          navigate("/");
+          navigate("/login", { replace: true });
       }
     } catch (err) {
       const msg = err?.response?.status === 401 ? "Invalid credentials" : (err?.response?.data?.message || err.message || "Login failed");
@@ -40,6 +68,17 @@ const Login = () => {
 
   return (
     <div className="flex items-center justify-center w-full min-h-screen bg-loginImage">
+      {/* Confirm modal for back-protection when already authenticated */}
+      <ConfirmModal
+        open={showConfirm}
+        title="Leave Dashboard?"
+        message="Are you sure you want to log out and go back to the login page?"
+        confirmText="Log Out"
+        cancelText="Stay"
+        onConfirm={() => { setShowConfirm(false); logout(); }}
+        onCancel={() => { setShowConfirm(false); navigateToRole(user?.role); }}
+      />
+
       <div className="bg-[rgba(33,19,9,0.9)] flex gap-8 justify-center text-white rounded-2xl p-12 py-6">
         {/* Left Side */}
         <div className="leftSide flex flex-col items-center justify-center">
