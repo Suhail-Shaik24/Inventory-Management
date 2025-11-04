@@ -19,7 +19,7 @@ import {
     LineChart,
     Line,
 } from 'recharts';
-import { ClipboardCheck, Boxes, Package, AlertTriangle, TrendingDown, Wrench, XCircle } from 'lucide-react';
+import { ClipboardCheck, Boxes, Package, AlertTriangle, TrendingDown, Wrench, XCircle, RefreshCw } from 'lucide-react';
 
 // Manager maps to Admin dashboard view; enforce role and back-protection here if needed
 export default function ManagerDashboard() {
@@ -45,6 +45,9 @@ export default function ManagerDashboard() {
     // Inventory stats (expired/low/damaged/trend)
     const [invStats, setInvStats] = useState(null);
     const [statsError, setStatsError] = useState('');
+
+    // New: low-stock items to build fallback trend dataset (no table)
+    const [lowItems, setLowItems] = useState([]);
 
     // Forms
     const [tab, setTab] = useState('warehouse'); // 'warehouse' | 'shelf'
@@ -147,21 +150,25 @@ export default function ManagerDashboard() {
         }
     };
 
+    // Load low-stock items for trend fallback
+    const loadLowStockItems = async () => {
+        try {
+            const { data } = await api.get('/api/inventory/lowstock');
+            const arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+            setLowItems(arr);
+        } catch (e) {
+            setLowItems([]);
+        }
+    };
+
     const loadAll = async () => {
         setLoading(true);
-        await Promise.all([loadSummary(), loadInvStats(), loadRecent()]).finally(() => setLoading(false));
+        await Promise.all([loadSummary(), loadInvStats(), loadRecent(), loadLowStockItems()]).finally(() => setLoading(false));
         await loadCategories();
     };
 
     useEffect(() => {
         loadAll();
-        const id = setInterval(() => {
-            // background refresh without toggling skeleton
-            loadSummary();
-            loadInvStats();
-            loadRecent();
-        }, 30000);
-        return () => clearInterval(id);
     }, []);
 
     useEffect(() => {
@@ -232,10 +239,27 @@ export default function ManagerDashboard() {
     // animate only on the first render of charts
     const animate = firstLoad;
 
-    // Re-introduce: Low stock trend dataset (all available points)
-    const lowTrend = useMemo(() => (
-        (invStats?.lowStockTrend || []).map(p => ({ day: p.day, count: p.count }))
-    ), [invStats]);
+    // Low stock trend dataset: prefer stats trend; if too few points, fallback to per-item points
+    const lowTrend = useMemo(() => {
+        const trend = Array.isArray(invStats?.lowStockTrend) ? invStats.lowStockTrend : [];
+        const points = trend.map(p => ({ day: p.day, count: p.count }));
+        if (points.length >= 9) return points;
+        if (Array.isArray(lowItems) && lowItems.length > 0) {
+            return lowItems.map((it, idx) => ({
+                day: (it.sku || it.name || `Item ${idx + 1}`),
+                count: Number(it.quantity ?? it.qty ?? it.stock ?? 0)
+            }));
+        }
+        return points;
+    }, [invStats, lowItems]);
+
+    const handleManualRefresh = async () => {
+        try {
+            await Promise.all([loadSummary(), loadInvStats(), loadRecent(), loadLowStockItems()]);
+        } catch (e) {
+            // ignore
+        }
+    };
 
     return (
         <div className="space-y-6 p-4 md:p-8">
@@ -419,7 +443,17 @@ export default function ManagerDashboard() {
                 <div className="min-w-0 rounded-xl bg-[#29190D]/70 p-6 shadow-lg shadow-black/30 backdrop-blur-sm ring-1 ring-white/10">
                     <div className="flex items-center justify-between gap-4">
                         <h3 className="text-lg font-semibold text-gray-100">Low-Stock Trend</h3>
-                        <div className="text-sm text-gray-300">Points: <span className="text-gray-100">{lowTrend.length}</span></div>
+                        <div className="flex items-center gap-3">
+                            <div className="text-sm text-gray-300">Points: <span className="text-gray-100">{lowTrend.length}</span></div>
+                            <button
+                                type="button"
+                                onClick={handleManualRefresh}
+                                disabled={refreshing}
+                                className="inline-flex items-center gap-2 rounded-lg bg-black/30 px-3 py-1.5 text-xs font-medium text-gray-200 ring-1 ring-white/10 transition hover:bg-black/40 disabled:opacity-50"
+                            >
+                                <RefreshCw className="h-4 w-4" /> Refresh
+                            </button>
+                        </div>
                     </div>
                     <div className="mt-4 h-96 w-full">
                         {firstLoad ? (
