@@ -5,6 +5,7 @@ import com.InventoryManagement.store.inventory.dto.CreateInventoryRequest;
 import com.InventoryManagement.store.inventory.dto.InventoryResponse;
 import com.InventoryManagement.store.inventory.dto.InventoryStatsDto;
 import com.InventoryManagement.store.inventory.service.InventoryService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -83,5 +84,11 @@ public class InventoryController {
     @PreAuthorize("hasAnyRole('CHECKER','MANAGER')")
     public ResponseEntity<InventoryResponse> reject(@PathVariable long id, Authentication auth) {
         return ResponseEntity.ok(service.reject(id, auth != null ? auth.getName() : "system"));
+    }
+
+    @GetMapping(value = "/lowstock", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasAnyRole('CHECKER','MANAGER')")
+    public ResponseEntity<List<InventoryResponse>> listLowStock(@RequestParam(name = "threshold", required = false) Integer threshold) {
+        return ResponseEntity.ok(service.listLowStock(threshold));
     }
 }

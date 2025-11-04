@@ -196,6 +196,15 @@ public class InventoryServiceImpl implements InventoryService {
         return out;
     }
 
+    @Override
+    public List<InventoryResponse> listLowStock(Integer threshold) {
+        int th = (threshold == null || threshold <= 0) ? 10 : threshold;
+        return repo.findByQuantityLessThanOrderByQuantityAsc(th)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
     private InventoryResponse toResponse(InventoryItem i) {
         InventoryResponse r = new InventoryResponse();
         r.setId(i.getId());

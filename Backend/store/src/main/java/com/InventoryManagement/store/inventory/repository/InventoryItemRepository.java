@@ -55,4 +55,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, Lo
 
     @Query("select count(i) from InventoryItem i where i.expiryAt is not null and i.expiryAt >= ?1 and i.expiryAt < ?2")
     long countExpiringBetween(Instant from, Instant to);
+
+    List<InventoryItem> findByQuantityLessThanOrderByQuantityAsc(int threshold);
 }

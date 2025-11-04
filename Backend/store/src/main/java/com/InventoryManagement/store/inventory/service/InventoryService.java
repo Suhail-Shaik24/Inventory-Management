@@ -16,4 +16,5 @@ public interface InventoryService {
     List<InventoryResponse> listAllByUser(String createdBy);
     InventoryResponse get(long id);
     InventoryStatsDto stats();
+    List<InventoryResponse> listLowStock(Integer threshold);
 }
