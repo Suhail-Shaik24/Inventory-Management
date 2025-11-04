@@ -255,7 +255,7 @@ app.jwt.expiration=86400000
 ```bash
 mvn clean install
 mvn spring-boot:run
-#For windows 
+#For windows :  cd Backend ,cd store 
 .\mvnw.cmd spring-boot:run
 ```
 
