@@ -255,6 +255,8 @@ app.jwt.expiration=86400000
 ```bash
 mvn clean install
 mvn spring-boot:run
+#For windows 
+.\mvnw.cmd spring-boot:run
 ```
 
 5\) Frontend configuration \(`frontend/.env`\).
