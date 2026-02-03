@@ -4,7 +4,9 @@ package com.InventoryManagement.store.inventory.controller;
 import com.InventoryManagement.store.inventory.dto.CreateInventoryRequest;
 import com.InventoryManagement.store.inventory.dto.InventoryResponse;
 import com.InventoryManagement.store.inventory.dto.InventoryStatsDto;
+import com.InventoryManagement.store.inventory.dto.CategorySliceDto;
 import com.InventoryManagement.store.inventory.service.InventoryService;
+import com.InventoryManagement.store.stock.repository.StockItemRepository;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,15 +15,18 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/inventory")
 public class InventoryController {
 
     private final InventoryService service;
+    private final StockItemRepository stockRepo;
 
-    public InventoryController(InventoryService service) {
+    public InventoryController(InventoryService service, StockItemRepository stockRepo) {
         this.service = service;
+        this.stockRepo = stockRepo;
     }
 
     @GetMapping("/pending")
@@ -53,8 +58,8 @@ public class InventoryController {
 
     @GetMapping("/stats")
     @PreAuthorize("hasAnyRole('CHECKER','MANAGER','MAKER')")
-    public ResponseEntity<InventoryStatsDto> stats() {
-        return ResponseEntity.ok(service.stats());
+    public ResponseEntity<InventoryStatsDto> stats(@RequestParam(name="threshold", required=false) Integer threshold) {
+        return ResponseEntity.ok(service.stats(threshold));
     }
 
     @GetMapping("/{id}")
@@ -90,5 +95,56 @@ public class InventoryController {
     @PreAuthorize("hasAnyRole('CHECKER','MANAGER')")
     public ResponseEntity<List<InventoryResponse>> listLowStock(@RequestParam(name = "threshold", required = false) Integer threshold) {
         return ResponseEntity.ok(service.listLowStock(threshold));
+    }
+
+    @GetMapping("/warehouse/exists")
+    @PreAuthorize("hasAnyRole('MANAGER','ADMIN')")
+    public ResponseEntity<?> warehouseExists(@RequestParam(required = false) String sku,
+                                             @RequestParam(required = false) String category,
+                                             @RequestParam(required = false) String item) {
+        String trimmedSku = sku == null ? null : sku.trim();
+        String trimmedCat = category == null ? null : category.trim();
+        String trimmedItem = item == null ? null : item.trim();
+
+        if ((trimmedSku == null || trimmedSku.isBlank()) &&
+            ((trimmedCat == null || trimmedCat.isBlank()) || (trimmedItem == null || trimmedItem.isBlank()))) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Provide either sku or category+item"));
+        }
+
+        if (trimmedSku != null && !trimmedSku.isBlank()) {
+            return stockRepo.findBySku(trimmedSku)
+                    .map(s -> ResponseEntity.ok(Map.of(
+                            "exists", true,
+                            "availableQuantity", s.getWarehouseQty()
+                    )))
+                    .orElseGet(() -> ResponseEntity.ok(Map.of(
+                            "exists", false,
+                            "availableQuantity", 0
+                    )));
+        }
+        // Fallback by category + item name
+        return stockRepo.findByCategoryIgnoreCaseAndItemNameIgnoreCase(trimmedCat, trimmedItem)
+                .map(s -> ResponseEntity.ok(Map.of(
+                        "exists", true,
+                        "availableQuantity", s.getWarehouseQty()
+                )))
+                .orElseGet(() -> ResponseEntity.ok(Map.of(
+                        "exists", false,
+                        "availableQuantity", 0
+                )));
+    }
+
+    @GetMapping("/categories")
+    @PreAuthorize("hasAnyRole('MANAGER','CHECKER','MAKER')")
+    public ResponseEntity<List<String>> listCategories() {
+        List<CategorySliceDto> slices = service.stats().getCategories();
+        List<String> names = slices.stream().map(CategorySliceDto::getName).distinct().toList();
+        return ResponseEntity.ok(names);
+    }
+
+    @GetMapping("/expired")
+    @PreAuthorize("hasAnyRole('CHECKER','MANAGER')")
+    public ResponseEntity<List<InventoryResponse>> listExpired() {
+        return ResponseEntity.ok(service.listExpired());
     }
 }

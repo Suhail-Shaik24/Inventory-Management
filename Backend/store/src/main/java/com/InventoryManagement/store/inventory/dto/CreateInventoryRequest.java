@@ -10,6 +10,7 @@ public class CreateInventoryRequest {
     private String description;
     private String category;
     private String location;
+    private String expiryDate; // ISO date (yyyy-MM-dd)
 
     public String getSku() { return sku; }
     public void setSku(String sku) { this.sku = sku; }
@@ -31,5 +32,7 @@ public class CreateInventoryRequest {
 
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
-}
 
+    public String getExpiryDate() { return expiryDate; }
+    public void setExpiryDate(String expiryDate) { this.expiryDate = expiryDate; }
+}

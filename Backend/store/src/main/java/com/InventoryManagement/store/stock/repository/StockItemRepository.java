@@ -3,6 +3,7 @@ package com.InventoryManagement.store.stock.repository;
 import com.InventoryManagement.store.stock.entity.StockItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,4 +21,11 @@ public interface StockItemRepository extends JpaRepository<StockItem, Long> {
 
     @Query("select s.category as category, sum(s.warehouseQty) as warehouseQty, sum(s.shelfQty) as shelfQty from StockItem s group by s.category")
     List<CatAgg> groupByCategory();
+
+    @Query("select count(s) from StockItem s where s.warehouseQty < :th")
+    Long countLowStockWarehouse(@Param("th") long threshold);
+
+    List<StockItem> findByWarehouseQtyLessThanOrderByWarehouseQtyAsc(long warehouseQty);
+
+    Optional<StockItem> findBySku(String sku);
 }

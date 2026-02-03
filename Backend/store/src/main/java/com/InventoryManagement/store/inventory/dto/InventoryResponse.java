@@ -15,6 +15,7 @@ public class InventoryResponse {
     private String status;
     private String createdBy;
     private Instant createdAt;
+    private String expiryDate; // yyyy-MM-dd (UTC)
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -48,5 +49,7 @@ public class InventoryResponse {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
-}
 
+    public String getExpiryDate() { return expiryDate; }
+    public void setExpiryDate(String expiryDate) { this.expiryDate = expiryDate; }
+}

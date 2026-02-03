@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import PageHeader from '../components/PageHeader';
 import { api } from '../api/client';
 import ConfirmModal from '../components/ConfirmModal.jsx';
@@ -16,10 +16,9 @@ import {
     Tooltip,
     Legend,
     ResponsiveContainer,
-    LineChart,
-    Line,
 } from 'recharts';
 import { ClipboardCheck, Boxes, Package, AlertTriangle, TrendingDown, Wrench, XCircle, RefreshCw } from 'lucide-react';
+import Toast from '../components/Toast.jsx';
 
 // Manager maps to Admin dashboard view; enforce role and back-protection here if needed
 export default function ManagerDashboard() {
@@ -46,11 +45,7 @@ export default function ManagerDashboard() {
     const [invStats, setInvStats] = useState(null);
     const [statsError, setStatsError] = useState('');
 
-    // New: low-stock items to build fallback trend dataset (no table)
-    const [lowItems, setLowItems] = useState([]);
-
     // Forms
-    const [tab, setTab] = useState('warehouse'); // 'warehouse' | 'shelf'
     const [mode, setMode] = useState('add'); // 'add' | 'set'
     const [categories, setCategories] = useState([]);
     const [items, setItems] = useState([]);
@@ -59,7 +54,16 @@ export default function ManagerDashboard() {
     const [qty, setQty] = useState('');
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
-    const [formSuccess, setFormSuccess] = useState('');
+    const [checking, setChecking] = useState(false);
+    const [availableQty, setAvailableQty] = useState(null);
+    const [threshold, setThreshold] = useState(10);
+    const [showToast, setShowToast] = useState(false);
+    const [toastType, setToastType] = useState('info');
+    const [toastMsg, setToastMsg] = useState('');
+    const [useSku, setUseSku] = useState(false);
+    const [sku, setSku] = useState('');
+    const debounceRef = useRef();
+    const midnightTimer = useRef(null);
 
     // Load stock summary
     const loadSummary = async () => {
@@ -83,7 +87,7 @@ export default function ManagerDashboard() {
         if (!firstLoad) setRefreshing(true);
         setStatsError('');
         try {
-            const { data } = await api.get('/api/inventory/stats');
+            const { data } = await api.get('/api/inventory/stats', { params: { threshold } });
             setInvStats(data || null);
         } catch (primaryErr) {
             // Optional fallback to separate endpoints if available
@@ -150,20 +154,9 @@ export default function ManagerDashboard() {
         }
     };
 
-    // Load low-stock items for trend fallback
-    const loadLowStockItems = async () => {
-        try {
-            const { data } = await api.get('/api/inventory/lowstock');
-            const arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
-            setLowItems(arr);
-        } catch (e) {
-            setLowItems([]);
-        }
-    };
-
     const loadAll = async () => {
         setLoading(true);
-        await Promise.all([loadSummary(), loadInvStats(), loadRecent(), loadLowStockItems()]).finally(() => setLoading(false));
+        await Promise.all([loadSummary(), loadInvStats(), loadRecent()]).finally(() => setLoading(false));
         await loadCategories();
     };
 
@@ -200,69 +193,158 @@ export default function ManagerDashboard() {
         (summary?.categories || []).map((c) => ({ name: c.category, warehouse: c.warehouseQty || 0, shelf: c.shelfQty || 0 }))
     ), [summary]);
 
+    // Validate item availability in warehouse for shelf operations
+    const validateShelfAvailability = async (selectedCategory, selectedItem, q, forSetMode = false) => {
+        try {
+            setChecking(true);
+            setFormError('');
+            const params = useSku && sku ? { sku } : { category: selectedCategory, item: selectedItem };
+            const { data } = await api.get('/api/inventory/warehouse/exists', { params });
+            const exists = !!data?.exists;
+            const available = Number(data?.availableQuantity ?? 0);
+            setAvailableQty(available);
+            if (!exists) {
+                setFormError('Item not found in warehouse. Cannot add to shelf.');
+                return { ok: false };
+            }
+            if (!forSetMode) {
+                if (!Number.isFinite(q) || q <= 0) {
+                    setFormError('Quantity must be a positive number.');
+                    return { ok: false };
+                }
+                if (available <= 0) {
+                    setFormError('Stock not available in warehouse');
+                    return { ok: false };
+                }
+                if (q > available) {
+                    setFormError(`Requested quantity exceeds available warehouse stock (Available: ${available} units).`);
+                    return { ok: false };
+                }
+            }
+            return { ok: true, available };
+        } catch (e) {
+            setFormError(e?.response?.data?.error || 'Failed to validate warehouse availability.');
+            return { ok: false };
+        } finally {
+            setChecking(false);
+        }
+    };
+
+    // Toast trigger helper
+    const triggerToast = (type, msg) => { setToastType(type); setToastMsg(msg); setShowToast(true); };
+
+    // Effect: whenever formError is set (and not currently checking/saving), show toast
+    useEffect(() => {
+        if (formError && !checking && !saving) {
+            triggerToast('error', formError);
+        }
+    }, [formError, checking, saving]);
+
+    // Auto validate when user changes shelf inputs (debounced)
+    useEffect(() => {
+        const qNum = Number(qty);
+        if (useSku) {
+            if (!sku) return; // need sku
+        } else {
+            if (!category || !item) return;
+        }
+        if (!Number.isFinite(qNum) || qNum <= 0) return;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            const selectedCategory = useSku ? undefined : (categories.find(c => String(c.id) === String(category))?.name || categories.find(c => String(c.name) === String(category))?.name || category);
+            const selectedItem = useSku ? undefined : (items.find(it => String(it.id) === String(item))?.name || items.find(it => String(it.name) === String(item))?.name || item);
+            validateShelfAvailability(selectedCategory, selectedItem, qNum, String(mode).toLowerCase() === 'set');
+        }, 400);
+        return () => debounceRef.current && clearTimeout(debounceRef.current);
+    }, [category, item, sku, qty, mode, useSku]);
+
     // Submit stock change
     const handleSubmit = async (e) => {
         e.preventDefault();
         setFormError('');
-        setFormSuccess('');
-
         const q = Number(qty);
-        if (!category || !item) { setFormError('Please select category and item.'); return; }
+        if (useSku) {
+            if (!sku) { setFormError('Enter a SKU.'); return; }
+        } else {
+            if (!category) { setFormError('Select a category.'); return; }
+            if (!item) { setFormError('Select an item.'); return; }
+        }
         if (!Number.isFinite(q) || q <= 0) { setFormError('Quantity must be a positive number.'); return; }
 
-        const catOk = categories.length === 0 || categories.some((c) => (c.id && String(c.id) === String(category)) || (c.name && String(c.name) === String(category)) || String(c) === String(category));
-        if (!catOk) { setFormError('Selected category is invalid.'); return; }
-
-        const endpoint = tab === 'warehouse' ? '/api/stock/warehouse' : '/api/stock/shelf';
         const payload = {
-            categoryId: categories.find((c) => String(c.id) === String(category))?.id || undefined,
-            category: categories.find((c) => String(c.name) === String(category))?.name || (categories.find((c) => String(c.id) === String(category))?.name) || (typeof category === 'string' ? category : undefined),
-            itemId: items.find((it) => String(it.id) === String(item))?.id || undefined,
-            item: items.find((it) => String(it.name) === String(item))?.name || (typeof item === 'string' ? item : undefined),
+            category: useSku ? undefined : (categories.find(c => String(c.name) === String(category))?.name || category),
+            item: useSku ? undefined : (items.find(it => String(it.name) === String(item))?.name || item),
             quantity: q,
             mode,
         };
 
+        const res = await validateShelfAvailability(payload.category, payload.item, q, String(mode).toLowerCase() === 'set');
+        if (!res.ok) return;
+
         setSaving(true);
         try {
-            await api.post(endpoint, payload);
-            setFormSuccess(`Stock ${mode === 'set' ? 'updated' : 'added'} to ${tab === 'warehouse' ? 'Warehouse' : 'Shelf'} successfully.`);
-            setQty('');
+            await api.post('/api/stock/shelf', useSku ? { ...payload, sku } : payload);
+            const successMsg = String(mode).toLowerCase() === 'set' ? 'Stock updated successfully.' : 'Stock added successfully.';
+            triggerToast('success', successMsg);
+            setQty(''); if (useSku) setSku('');
             await Promise.all([loadSummary(), loadInvStats()]);
         } catch (e) {
-            setFormError(e?.response?.data?.message || 'Failed to update stock.');
-        } finally {
-            setSaving(false);
-        }
+            triggerToast('error', e?.response?.data?.message || e?.response?.data?.error || 'Failed to update shelf stock.');
+        } finally { setSaving(false); }
     };
 
     // animate only on the first render of charts
     const animate = firstLoad;
 
-    // Low stock trend dataset: prefer stats trend; if too few points, fallback to per-item points
-    const lowTrend = useMemo(() => {
-        const trend = Array.isArray(invStats?.lowStockTrend) ? invStats.lowStockTrend : [];
-        const points = trend.map(p => ({ day: p.day, count: p.count }));
-        if (points.length >= 9) return points;
-        if (Array.isArray(lowItems) && lowItems.length > 0) {
-            return lowItems.map((it, idx) => ({
-                day: (it.sku || it.name || `Item ${idx + 1}`),
-                count: Number(it.quantity ?? it.qty ?? it.stock ?? 0)
-            }));
-        }
-        return points;
-    }, [invStats, lowItems]);
-
     const handleManualRefresh = async () => {
         try {
-            await Promise.all([loadSummary(), loadInvStats(), loadRecent(), loadLowStockItems()]);
+            await Promise.all([loadSummary(), loadInvStats(), loadRecent()]);
         } catch (e) {
             // ignore
         }
     };
 
+    const scheduleMidnightRefresh = () => {
+        if (midnightTimer.current) clearTimeout(midnightTimer.current);
+        try {
+            const now = new Date();
+            const next = new Date(now);
+            // schedule at 00:05 next day local time
+            next.setDate(now.getDate() + 1);
+            next.setHours(0, 5, 0, 0);
+            const ms = Math.max(60_000, next.getTime() - now.getTime());
+            midnightTimer.current = setTimeout(async () => {
+                await loadInvStats();
+                scheduleMidnightRefresh(); // reschedule for the following day
+            }, ms);
+        } catch (_) { /* ignore */ }
+    };
+
+    useEffect(() => {
+        // Listen for cross-tab storage updates
+        const onStorage = (e) => {
+            if (e?.key === 'inventory:updated') {
+                loadInvStats();
+            }
+        };
+        window.addEventListener('storage', onStorage);
+        // Listen for same-tab custom event
+        const onCustom = () => loadInvStats();
+        window.addEventListener('inventory:updated', onCustom);
+        // Schedule midnight refresh so naturally-expiring items reflect without reload
+        scheduleMidnightRefresh();
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener('inventory:updated', onCustom);
+            if (midnightTimer.current) clearTimeout(midnightTimer.current);
+        };
+    }, []);
+
     return (
         <div className="space-y-6 p-4 md:p-8">
+            {/* Global toast */}
+            <Toast open={showToast} type={toastType} message={toastMsg} onClose={() => setShowToast(false)} />
+
             <ConfirmModal
                 open={confirmOpen}
                 title="Leave Dashboard?"
@@ -317,17 +399,29 @@ export default function ManagerDashboard() {
 
             {/* Stock forms */}
             <div className="rounded-xl bg-[#29190D]/70 shadow-lg shadow-black/30 backdrop-blur-sm ring-1 ring-white/10">
-                <div className="flex items-center gap-4 border-b border-white/10 px-4 pt-4">
-                    <button onClick={() => setTab('warehouse')} className={`rounded-t-lg px-4 py-2 text-sm font-medium ${tab === 'warehouse' ? 'border-b-2 border-blue-500 text-blue-300' : 'text-gray-300 hover:text-gray-100'}`}>Add to Warehouse</button>
-                    <button onClick={() => setTab('shelf')} className={`rounded-t-lg px-4 py-2 text-sm font-medium ${tab === 'shelf' ? 'border-b-2 border-blue-500 text-blue-300' : 'text-gray-300 hover:text-gray-100'}`}>Add to Shelf</button>
+                <div className="px-6 pt-6">
+                    <h3 className="text-2xl font-semibold text-gray-100">Add to Shelf</h3>
+                    {formError && (
+                        <div className="mt-2 rounded-md border border-red-500/40 bg-red-600/15 px-3 py-2 text-xs text-red-200">
+                            {formError}
+                        </div>
+                    )}
                 </div>
-
-                {(formError || formSuccess) && (
-                    <div className="px-4 pt-4">
-                        {formSuccess && <div className="mb-2 rounded bg-green-600/20 p-2 text-green-300">{formSuccess}</div>}
-                        {formError && <div className="mb-2 rounded bg-red-600/20 p-2 text-red-300">{formError}</div>}
+                <div className="px-4 py-4">
+                    {/* Threshold & Mode Row */}
+                    <div className="flex flex-wrap gap-4 items-center text-xs text-gray-300">
+                        <label className="flex items-center gap-2">Low-stock threshold:
+                            <input type="number" min="1" value={threshold} onChange={(e)=>setThreshold(Number(e.target.value)||10)} className="w-20 rounded bg-gray-800 px-2 py-1 text-gray-100" />
+                            <button type="button" onClick={handleManualRefresh} className="rounded bg-black/40 px-2 py-1 hover:bg-black/60">Apply</button>
+                        </label>
+                        <label className="flex items-center gap-2 ml-auto">Use SKU instead of Category/Item:
+                            <input type="checkbox" checked={useSku} onChange={(e)=>{setUseSku(e.target.checked); setFormError('');}} />
+                        </label>
+                        {useSku && (
+                            <input placeholder="SKU" value={sku} onChange={(e)=>setSku(e.target.value)} className="rounded bg-gray-800 px-3 py-2 text-gray-100" />
+                        )}
                     </div>
-                )}
+                </div>
 
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 p-4 md:grid-cols-5">
                     {/* Category selector */}
@@ -363,7 +457,21 @@ export default function ManagerDashboard() {
                     {/* Quantity */}
                     <div>
                         <label className="mb-1 block text-xs text-gray-300">Quantity</label>
-                        <input type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="e.g., 25" className="w-full rounded-md bg-gray-800 px-3 py-2 text-gray-100" />
+                        <input
+                            type="number"
+                            min="1"
+                            value={qty}
+                            onChange={(e) => setQty(e.target.value)}
+                            placeholder="e.g., 25"
+                            className="w-full rounded-md bg-gray-800 px-3 py-2 text-gray-100"
+                        />
+                        {/* Availability info (shelf only) */}
+                        <div className="mt-1 text-xs">
+                            {checking && <span className="text-gray-400">Checking availability…</span>}
+                            {!checking && availableQty !== null && formError.startsWith('Requested quantity exceeds') === false && formError.startsWith('Item not found') === false && (
+                                <span className="text-gray-300">Available in warehouse: <span className="text-gray-100 font-semibold">{availableQty}</span></span>
+                            )}
+                        </div>
                     </div>
 
                     {/* Mode */}
@@ -376,8 +484,8 @@ export default function ManagerDashboard() {
                     </div>
 
                     <div className="md:col-span-5 flex justify-end">
-                        <button type="submit" disabled={saving} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-500 disabled:opacity-60">
-                            {saving ? 'Saving…' : `Save ${tab === 'warehouse' ? 'Warehouse' : 'Shelf'} Stock`}
+                        <button type="submit" disabled={saving || checking} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-black transition hover:bg-amber-500 disabled:opacity-60">
+                            {saving ? 'Saving…' : checking ? 'Validating…' : `Save Shelf Stock`}
                         </button>
                     </div>
                 </form>
@@ -432,42 +540,6 @@ export default function ManagerDashboard() {
                                     <Bar dataKey="warehouse" stackId="a" fill={PIE_COLORS[0]} name="Warehouse" radius={[4,4,0,0]} isAnimationActive={animate} />
                                     <Bar dataKey="shelf" stackId="a" fill={PIE_COLORS[1]} name="Shelf" radius={[4,4,0,0]} isAnimationActive={animate} />
                                 </BarChart>
-                            </ResponsiveContainer>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* Low-Stock Trend (full width) */}
-            <div className="grid grid-cols-1 gap-6">
-                <div className="min-w-0 rounded-xl bg-[#29190D]/70 p-6 shadow-lg shadow-black/30 backdrop-blur-sm ring-1 ring-white/10">
-                    <div className="flex items-center justify-between gap-4">
-                        <h3 className="text-lg font-semibold text-gray-100">Low-Stock Trend</h3>
-                        <div className="flex items-center gap-3">
-                            <div className="text-sm text-gray-300">Points: <span className="text-gray-100">{lowTrend.length}</span></div>
-                            <button
-                                type="button"
-                                onClick={handleManualRefresh}
-                                disabled={refreshing}
-                                className="inline-flex items-center gap-2 rounded-lg bg-black/30 px-3 py-1.5 text-xs font-medium text-gray-200 ring-1 ring-white/10 transition hover:bg-black/40 disabled:opacity-50"
-                            >
-                                <RefreshCw className="h-4 w-4" /> Refresh
-                            </button>
-                        </div>
-                    </div>
-                    <div className="mt-4 h-96 w-full">
-                        {firstLoad ? (
-                            <div className="h-full w-full animate-pulse rounded-lg bg-white/10" />
-                        ) : (
-                            <ResponsiveContainer width="100%" height="100%" debounce={150}>
-                                <LineChart data={lowTrend}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartGridColor} />
-                                    <XAxis dataKey="day" tick={{ fill: chartTextColor }} />
-                                    <YAxis tick={{ fill: chartTextColor }} />
-                                    <Tooltip contentStyle={{ backgroundColor: tooltipBg, borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', border: 'none' }} itemStyle={{ color: chartTextColor }} labelStyle={{ color: chartTextColor }} />
-                                    <Legend />
-                                    <Line type="monotone" dataKey="count" name="Low Stock Count" stroke="#F59E0B" strokeWidth={2} dot={{ r: 2 }} isAnimationActive={animate} />
-                                </LineChart>
                             </ResponsiveContainer>
                         )}
                     </div>

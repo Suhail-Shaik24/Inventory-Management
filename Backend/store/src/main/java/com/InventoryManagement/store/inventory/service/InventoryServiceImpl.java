@@ -7,6 +7,8 @@ import com.InventoryManagement.store.inventory.dto.CategorySliceDto;
 import com.InventoryManagement.store.inventory.entity.InventoryItem;
 import com.InventoryManagement.store.inventory.entity.InventoryStatus;
 import com.InventoryManagement.store.inventory.repository.InventoryItemRepository;
+import com.InventoryManagement.store.stock.service.StockServiceImpl;
+import com.InventoryManagement.store.stock.entity.StockItem;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,18 +18,23 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class InventoryServiceImpl implements InventoryService {
 
     private final InventoryItemRepository repo;
+    private final StockServiceImpl stockService; // direct impl injection for helper usage
 
-    public InventoryServiceImpl(InventoryItemRepository repo) {
+    public InventoryServiceImpl(InventoryItemRepository repo, StockServiceImpl stockService) {
         this.repo = repo;
+        this.stockService = stockService;
     }
 
     @Override
@@ -49,6 +56,15 @@ public class InventoryServiceImpl implements InventoryService {
         item.setDescription(nullToEmpty(req.getDescription()));
         item.setCategory(nullToEmpty(req.getCategory()));
         item.setLocation(nullToEmpty(req.getLocation()));
+        // expiry
+        if (req.getExpiryDate() != null && !req.getExpiryDate().isBlank()) {
+            try {
+                LocalDate d = LocalDate.parse(req.getExpiryDate());
+                item.setExpiryAt(d.atStartOfDay().toInstant(ZoneOffset.UTC));
+            } catch (Exception ex) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid expiryDate; expected yyyy-MM-dd");
+            }
+        }
         item.setStatus(InventoryStatus.PENDING);
         item.setCreatedBy(createdBy != null ? createdBy : "system");
         item.setCreatedAt(Instant.now());
@@ -88,8 +104,9 @@ public class InventoryServiceImpl implements InventoryService {
         item.setStatus(InventoryStatus.APPROVED);
         item.setApprovedBy(approvedBy != null ? approvedBy : "system");
         item.setApprovedAt(Instant.now());
-
         InventoryItem saved = repo.saveAndFlush(item);
+        // Auto-add into warehouse stock
+        stockService.addFromApprovedInventory(saved);
         return toResponse(saved);
     }
 
@@ -169,7 +186,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    public InventoryStatsDto stats() {
+    public InventoryStatsDto stats(Integer thresholdOverride) {
         long approved = repo.countByStatus(InventoryStatus.APPROVED);
         long pending = repo.countByStatus(InventoryStatus.PENDING);
         long rejected = repo.countByStatus(InventoryStatus.REJECTED);
@@ -179,12 +196,11 @@ public class InventoryServiceImpl implements InventoryService {
                 .collect(Collectors.toList());
 
         InventoryStatsDto out = new InventoryStatsDto(approved, pending, rejected, categories);
-        // New analytics
         Instant now = Instant.now();
         out.setExpired(repo.countExpiredBefore(now));
         out.setDamaged(repo.countDamaged());
-        int threshold = 10; // could externalize
-        out.setLowStock(repo.countLowStock(threshold));
+        int threshold = (thresholdOverride == null || thresholdOverride <= 0) ? 10 : thresholdOverride;
+        out.setLowStock(stockService.countLowStockAgainstWarehouse(threshold));
         out.setNearExpiring(repo.countExpiringBetween(now, now.plus(7, ChronoUnit.DAYS)));
         List<Object[]> points = repo.lowStockTrend(threshold, PageRequest.of(0, 30));
         out.setLowStockTrend(points.stream().map(o -> {
@@ -199,10 +215,25 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     public List<InventoryResponse> listLowStock(Integer threshold) {
         int th = (threshold == null || threshold <= 0) ? 10 : threshold;
-        return repo.findByQuantityLessThanOrderByQuantityAsc(th)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        // Switch to stock-based low-stock list (warehouse qty)
+        List<StockItem> low = stockService.listLowStockWarehouse(th);
+        return low.stream().map(s -> {
+            InventoryResponse r = new InventoryResponse();
+            r.setSku(s.getSku());
+            r.setName(s.getItemName());
+            r.setCategory(s.getCategory());
+            r.setQuantity(Math.toIntExact(Math.min(Integer.MAX_VALUE, Math.max(0, s.getWarehouseQty()))));
+            r.setDescription("");
+            r.setLocation("");
+            r.setStatus("LOW");
+            return r;
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<InventoryResponse> listExpired() {
+        List<InventoryItem> list = repo.findByExpiryAtIsNotNullAndExpiryAtBeforeOrderByExpiryAtAsc(Instant.now());
+        return list.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     private InventoryResponse toResponse(InventoryItem i) {
@@ -218,6 +249,10 @@ public class InventoryServiceImpl implements InventoryService {
         r.setStatus(i.getStatus().name());
         r.setCreatedBy(i.getCreatedBy());
         r.setCreatedAt(i.getCreatedAt());
+        // expiry
+        if (i.getExpiryAt() != null) {
+            r.setExpiryDate(i.getExpiryAt().atZone(ZoneOffset.UTC).toLocalDate().toString());
+        }
         return r;
     }
 

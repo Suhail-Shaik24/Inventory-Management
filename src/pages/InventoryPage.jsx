@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import PageHeader from '../components/PageHeader';
 import bwipjs from "bwip-js";
 import { api } from '../api/client';
@@ -16,8 +16,9 @@ import {
     FileText,
     User,
     List,
+    AlertTriangle,
+    TrendingDown
 } from 'lucide-react';
-import JsBarcode from 'jsbarcode';
 
 // --- Reusable Sub-Page Header ---
 // This component provides a title and a "Back" button for each function
@@ -38,10 +39,16 @@ const SubPageHeader = ({ title, onBack }) => (
 const InventoryGrid = ({ setView }) => {
     const inventoryOptions = [
         {
-            title: 'Manage Products',
-            description: 'Edit, delete, or view all products.',
-            icon: Package,
-            view: 'manageProducts',
+            title: 'Expired Items',
+            description: 'View all expired stock items.',
+            icon: AlertTriangle,
+            view: 'expiredItems',
+        },
+        {
+            title: 'Low Stock Items',
+            description: 'View items below the stock threshold.',
+            icon: TrendingDown,
+            view: 'lowStockItems',
         },
         {
             title: 'Add New Stock',
@@ -49,7 +56,6 @@ const InventoryGrid = ({ setView }) => {
             icon: PlusSquare,
             view: 'addStock',
         },
-        
         {
             title: 'Upload Inventory File',
             description: 'Bulk upload stock via CSV/file feed.',
@@ -186,11 +192,16 @@ const AddStockView = ({ setView }) => {
         : '',
       category: formData.category,
       location: 'A1',
+      expiryDate: formData.expiryDate || undefined,
     };
 
     try {
       setSubmitting(true);
       await api.post('/api/inventory', payload);
+      try {
+        localStorage.setItem('inventory:updated', String(Date.now()));
+        window.dispatchEvent(new CustomEvent('inventory:updated', { detail: { sku: payload.sku, expiryDate: payload.expiryDate || null } }));
+      } catch (_) {}
       setShowSuccess(true); // open modal instead of alert
     } catch (err) {
       const msg =
@@ -233,14 +244,17 @@ const AddStockView = ({ setView }) => {
               name="category"
               value={formData.category}
               onChange={handleChange}
-              className={inputClass}
+              className={`${inputClass} category-select bg-[#2a1a10] text-amber-100 placeholder-amber-200 focus:bg-[#332016] focus:text-amber-100 focus:ring-amber-500/70 border border-amber-600/40`}
+              style={{ WebkitAppearance: 'none', MozAppearance: 'none' }}
             >
-              <option>Produce</option>
-              <option>Dairy</option>
-              <option>Bakery</option>
-              <option>Pantry</option>
-              <option>Frozen</option>
+              <option value="" disabled className="text-gray-400 bg-[#2a1a10]">-- Select Category --</option>
+              <option className="bg-[#2a1a10] text-amber-100 hover:bg-[#3a2416]" value="Produce">Produce</option>
+              <option className="bg-[#2a1a10] text-amber-100 hover:bg-[#3a2416]" value="Dairy">Dairy</option>
+              <option className="bg-[#2a1a10] text-amber-100 hover:bg-[#3a2416]" value="Bakery">Bakery</option>
+              <option className="bg-[#2a1a10] text-amber-100 hover:bg-[#3a2416]" value="Pantry">Pantry</option>
+              <option className="bg-[#2a1a10] text-amber-100 hover:bg-[#3a2416]" value="Frozen">Frozen</option>
             </select>
+            <p className="mt-1 text-xs text-amber-300/70">Choose a category</p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
@@ -258,7 +272,7 @@ const AddStockView = ({ setView }) => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300">
-                Total Cost
+                  Cost
               </label>
               <input
                 type="number"
@@ -478,7 +492,134 @@ const BarcodeView = ({ setView }) => {
     );
 };
 
+// New: Expired Items View
+const ExpiredItemsView = ({ setView }) => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
+  const load = async () => {
+    setLoading(true); setError('');
+    try {
+      const { data } = await api.get('/api/inventory/expired');
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+      setRows(list);
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.response?.statusText || 'Failed to load expired items');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div className="animate-fadeIn">
+      <SubPageHeader title="Expired Items" onBack={() => setView('main')} />
+      {error && (
+        <div className="mb-4 rounded-md border border-red-500/30 bg-red-600/15 p-3 text-sm text-red-200">{error}</div>
+      )}
+      <div className="overflow-hidden rounded-xl bg-[#29190D]/70 shadow-lg shadow-black/30 backdrop-blur-sm ring-1 ring-white/10">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-2 text-amber-400"><AlertTriangle className="h-5 w-5" /><span className="font-semibold">Expired Stock</span></div>
+          <button onClick={load} disabled={loading} className="rounded-lg bg-black/30 px-3 py-1.5 text-xs text-gray-200 ring-1 ring-white/10 transition hover:bg-black/40 disabled:opacity-50">{loading ? 'Refreshing…' : 'Refresh'}</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead className="bg-black/10">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Product Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Quantity</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Expiry Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Warehouse Location</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {rows.map((r, idx) => (
+                <tr key={r.id || r.sku || idx} className="hover:bg-black/10">
+                  <td className="px-6 py-3 text-sm text-gray-200">{r.name || r.itemName || '-'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-300">{r.quantity ?? r.qty ?? r.stock ?? '-'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-300">{r.category || '-'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-300">{r.expiryDate ? new Date(r.expiryDate).toLocaleDateString() : '-'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-300">{r.location || r.warehouseLocation || 'Warehouse'}</td>
+                </tr>
+              ))}
+              {(!loading && rows.length === 0) && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-6 text-center text-sm text-gray-400">No expired items.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// New: Low Stock Items View
+const LowStockItemsView = ({ setView }) => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    setLoading(true); setError('');
+    try {
+      const { data } = await api.get('/api/inventory/lowstock');
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+      setRows(list);
+    } catch (e) {
+      setError(e?.response?.data?.message || e?.response?.statusText || 'Failed to load low stock items');
+      setRows([]);
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div className="animate-fadeIn">
+      <SubPageHeader title="Low Stock Items" onBack={() => setView('main')} />
+      {error && (
+        <div className="mb-4 rounded-md border border-red-500/30 bg-red-600/15 p-3 text-sm text-red-200">{error}</div>
+      )}
+      <div className="overflow-hidden rounded-xl bg-[#29190D]/70 shadow-lg shadow-black/30 backdrop-blur-sm ring-1 ring-white/10">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-2 text-amber-400"><TrendingDown className="h-5 w-5" /><span className="font-semibold">Items Below Threshold</span></div>
+          <button onClick={load} disabled={loading} className="rounded-lg bg-black/30 px-3 py-1.5 text-xs text-gray-200 ring-1 ring-white/10 transition hover:bg-black/40 disabled:opacity-50">{loading ? 'Refreshing…' : 'Refresh'}</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead className="bg-black/10">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-400">Warehouse Qty</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10">
+              {rows.map((r, idx) => (
+                <tr key={r.id || r.sku || idx} className="hover:bg-black/10">
+                  <td className="px-6 py-3 text-sm text-gray-200">{r.sku || '-'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-300">{r.name || r.itemName || '-'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-300">{r.category || '-'}</td>
+                  <td className="px-6 py-3 text-sm text-gray-300">{r.quantity ?? r.qty ?? r.warehouseQty ?? '-'}</td>
+                </tr>
+              ))}
+              {(!loading && rows.length === 0) && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-6 text-center text-sm text-gray-400">No low stock items.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // --- Main Exported Component ---
 const InventoryPage = () => {
@@ -486,6 +627,10 @@ const InventoryPage = () => {
 
     const renderView = () => {
         switch (view) {
+            case 'expiredItems':
+                return <ExpiredItemsView setView={setView} />;
+            case 'lowStockItems':
+                return <LowStockItemsView setView={setView} />;
             case 'manageProducts':
                 return <ManageProductsView setView={setView} />;
             case 'addStock':
@@ -512,4 +657,3 @@ const InventoryPage = () => {
 };
 
 export default InventoryPage;
-

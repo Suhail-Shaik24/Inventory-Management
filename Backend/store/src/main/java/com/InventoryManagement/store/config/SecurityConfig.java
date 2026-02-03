@@ -54,6 +54,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/stock/summary").hasAnyRole("MANAGER","ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/stock/warehouse").hasAnyRole("MANAGER","ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/stock/shelf").hasAnyRole("MANAGER","ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/inventory/warehouse/exists").hasAnyRole("MANAGER","ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/inventory/categories").hasAnyRole("MAKER","CHECKER","MANAGER")
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()
             )
